@@ -7,7 +7,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <string>
-#include "ActiveParticleSimulator.h"
+#include "activeParticleSimulator.h"
 namespace py = pybind11;
 
 

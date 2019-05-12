@@ -12,7 +12,7 @@
     "trajOutputFlag":true,
     "filetag":"trajOut_obs",
     "maxSpeed": 1e-6,
-    "maxAngleTurn": 15,
+    "maxTurnAngle": 15,
     "obstacleFlag": true,
     "wallFlag": true,
     "obstaclePadding":11,

@@ -86,6 +86,11 @@ class ActiveParticleEnv():
             self.obstacleFlg = self.config['obstacleFlag']
             
         self.nStep = self.config['modelNStep']
+        self.endThresh = 0.1
+        if 'endThresh' in self.config:
+            self.endThresh = self.config['endThresh']
+
+
 
     def thresh_by_episode(self, step):
         return self.endThresh + (
@@ -216,7 +221,7 @@ class ActiveParticleEnv():
         return state, reward, done, info
 
     def is_terminal(self, distance):
-        return np.linalg.norm(distance, ord=np.inf) < 0.1
+        return np.linalg.norm(distance, ord=np.inf) < self.endThresh
 
     def reset_helper(self):
         # set target information

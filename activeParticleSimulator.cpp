@@ -1,4 +1,4 @@
-#include "ActiveParticleSimulator.h"
+#include "activeParticleSimulator.h"
 
 
 double const ActiveParticleSimulator::T = 293.0;
@@ -51,27 +51,34 @@ void ActiveParticleSimulator::readConfigFile(){
 
     maxSpeed = config["maxSpeed"];
     radius = config["radius"];
-    dt_ = config["dt"];
-    maxTurnSpeed = 15.0/180.0*3.1415926; // 1 s turn 15 degree
+    dt_ = config["dt"]; // units of characteristc time
+   
+    diffusivity_r = 0.161; // characteristic time scale is about 6s
+		Tc = 1.0 / diffusivity_r;
+		dt_ = dt_*Tc;
+    diffusivity_t = 2.145e-13;// this corresponds the diffusivity of 1um particle
+		diffusivity_t = 2.145e-14;// here I want to manually decrease the random noise
+    //diffusivity_r = parameter.diffu_r; // this correponds to rotation diffusity of 1um particle
+    maxTurnSpeed = 15.0/180.0*3.1415926/Tc*10; //0.1 Tc turn 15 degree
     if(config.contains("maxTurnAngle")){
         double angle =  config["maxTurnAngle"];
-        maxTurnSpeed = angle/180.0*3.1415926;
+        maxTurnSpeed = angle/180.0*3.1415926/Tc*10;
     }
     angleRatio = 1.0;
     if(config.contains("angleRatio")){
         double ratio =  config["angleRatio"];
         angleRatio = ratio;
     }      
-    
-    diffusivity_r = 0.161; // characteristic time scale is about 6s
-    diffusivity_t = 2.145e-13;// this corresponds the diffusivity of 1um particle
-    //diffusivity_r = parameter.diffu_r; // this correponds to rotation diffusity of 1um particle
+ 
     Bpp = config["Bpp"];
     Bpp = Bpp * kb * T * 1e9; //2.29 is Bpp/a/kT
     Kappa = config["kappa"]; // here is kappa*radius
     radius_nm = radius*1e9;
     mobility = diffusivity_t/kb/T;
     trajOutputInterval = 1.0/dt_;
+		if(config.contains("trajOutputInterval")){
+			trajOutputInterval = config["trajOutputInterval"];
+		}
     fileCounter = 0;
     cutoff = config["cutoff"];
     trajOutputFlag = config["trajOutputFlag"];

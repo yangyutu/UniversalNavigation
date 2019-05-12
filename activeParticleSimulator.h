@@ -106,7 +106,7 @@ private:
     int numControl;
     double mapRows, mapCols;
     std::string iniFile;
-    double dt_, cutoff, mobility, diffusivity_r, diffusivity_t;
+    double dt_, cutoff, mobility, diffusivity_r, diffusivity_t, Tc;
     std::default_random_engine rand_generator;
     std::shared_ptr<std::normal_distribution<double>> rand_normal;
     int trajOutputInterval;

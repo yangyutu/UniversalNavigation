@@ -7,10 +7,10 @@ VPATH = cppTest
 
 DEBUGFLAG=-DDEBUG -g3 -O0 -fPIC
 RELEASEFLAG= -O3 -march=native -DARMA_NO_DEBUG
-CXXFLAGS=  -std=c++11 $(BOOST_INCLUDE) -D__LINUX   `python-config --cflags` `/home/yangyutu123/anaconda3/bin/python -m pybind11 --includes` 
-LDFLAG= -L/opt/OpenBLAS/lib  -llapack -lblas  -pthread -no-pie `python-config --ldflags`
+CXXFLAGS=  -std=c++11 $(BOOST_INCLUDE) -D__LINUX  -I/home-4/yyang60@jhu.edu/work/Yang/Downloads/pybind11/include `python-config --cflags` `python -m pybind11 --includes` 
+LDFLAG= -L/opt/OpenBLAS/lib  -pthread  `python-config --ldflags`
 
-OBJ=testSimulator.o ActiveParticleSimulator.o
+OBJ=testSimulator.o activeParticleSimulator.o
 
 test.exe: $(OBJ)
 	$(CXX) -o $@ $^ $(LDFLAG) 

@@ -35,4 +35,35 @@ for i in range(step):
         
 
 
+env = ActiveParticleEnv('config_SP.json',1)
+
+step = 20
+
+state = env.reset()
+print(state)
+
+for i in range(step):
+    state = env.currentState
+    u = math.cos(state[2])*0.1
+    v = math.sin(state[2])*0.1   
+    w = 1.0
+    nextState, reward, action, info = env.step(np.array([w]))
+    print(nextState)
+    print(info)
+
+env = ActiveParticleEnv('config_CIRCLER.json',1)
+
+step = 100
+
+state = env.reset()
+print(state)
+
+for i in range(step):
+    state = env.currentState
+    u = math.cos(state[2])*0.1
+    v = math.sin(state[2])*0.1   
+    w = 1.0
+    nextState, reward, action, info = env.step(np.array([w]))
+    print(nextState)
+    print(info)
         

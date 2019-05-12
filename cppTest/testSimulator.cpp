@@ -1,4 +1,4 @@
-#include "../ActiveParticleSimulator.h"
+#include "../activeParticleSimulator.h"
 
 
 
