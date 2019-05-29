@@ -1,8 +1,7 @@
 CC = gcc
 CXX = g++
 
-HOME=/home/yangyutu123/
-BOOST_INCLUDE=-I/opt/boost/boost_1_57_0
+HOME=/home/yangyutu/
 VPATH = cppTest
 
 DEBUGFLAG=-DDEBUG -g3 -O0 -fPIC

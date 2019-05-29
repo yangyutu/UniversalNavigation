@@ -92,7 +92,7 @@ private:
     void calForces();
     void calForcesHelper_DL(double ri[3], double rj[3], double F[3],int i, int j);    
     bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag;
-    double angleRatio;
+    double angleRatio, circularRadius;
     static const int dimP = 2;
     static const double kb, T, vis;
     int randomSeed;
