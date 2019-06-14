@@ -27,7 +27,7 @@ class ActiveParticleEnv():
         self.steps_beyond_done = None
         self.stepCount = 0
 
-        self.infoDict = {}
+        self.info = {}
 
         random.seed(self.randomSeed)
         np.random.seed(self.randomSeed)
@@ -152,6 +152,15 @@ class ActiveParticleEnv():
         dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
         dy = - distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
 
+        angle = math.atan2(dy, dx)
+        if math.sqrt(dx**2 + dy**2) > self.targetClipLength:
+            dx = self.targetClipLength * math.cos(angle)
+            dy = self.targetClipLength * math.sin(angle)
+
+        # recover the global target position after target mapping
+        globalTargetX = self.currentState[0] + dx * math.cos(phi) - dy * math.sin(phi)
+        globalTargetY = self.currentState[1] + dx * math.sin(phi) + dy * math.cos(phi)
+
 
         if self.obstacleFlg:
 
@@ -210,15 +219,24 @@ class ActiveParticleEnv():
             dx = self.targetClipLength * math.cos(angle)
             dy = self.targetClipLength * math.sin(angle)
 
-        info = {'currentState': np.array(self.currentState),
-                'targetState': np.array(self.targetState)}
+        # recover the global target position after target mapping
+        globalTargetX = self.currentState[0] + dx * math.cos(phi) - dy * math.sin(phi)
+        globalTargetY = self.currentState[1] + dx * math.sin(phi) + dy * math.cos(phi)
+
+
+        self.info['previousTarget'] = self.info['currentTarget'].copy()
+        self.info['currentState'] = self.currentState.copy()
+        self.info['targetState'] = self.targetState.copy()
+        self.info['currentTarget'] = np.array([globalTargetX, globalTargetY])
+        self.info['currentDistance'] = math.sqrt(dx**2 + dy**2)
 
         if self.obstacleFlg:
+
             state = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                         'target': np.array([dx , dy])}
+                     'target': np.array([dx , dy])}
         else:
             state = np.array([dx , dy])
-        return state, reward, done, info
+        return state, reward, done, self.info.copy()
 
     def is_terminal(self, distance):
         return np.linalg.norm(distance, ord=np.inf) < self.endThresh
@@ -256,6 +274,7 @@ class ActiveParticleEnv():
     def reset(self):
         self.stepCount = 0
         self.hindSightInfo = {}
+        self.info = {}
         self.epiCount += 1
 
         self.currentState = np.array(self.config['currentState'], dtype=np.float32)
@@ -278,11 +297,15 @@ class ActiveParticleEnv():
             dx = self.targetClipLength * math.cos(angle)
             dy = self.targetClipLength * math.sin(angle)
 
+        globalTargetX = self.currentState[0]+ dx * math.cos(phi) - dy * math.sin(phi)
+        globalTargetY = self.currentState[1]+ dx * math.sin(phi) + dy * math.cos(phi)
+
+        self.info['currentTarget'] = np.array([globalTargetX, globalTargetY])
 
         #angleDistance = math.atan2(distance[1], distance[0]) - self.currentState[2]
         if self.obstacleFlg:
             combinedState = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                         'target': np.array([dx , dy ])}
+                             'target': np.array([dx , dy ])}
             return combinedState
         else:
             return np.array([dx , dy])

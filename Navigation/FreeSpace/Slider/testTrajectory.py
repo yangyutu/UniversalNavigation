@@ -101,35 +101,50 @@ config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
 config['currentState'] = [15, 15, 0]
 config['targetState'] = [10, 15]
-config['filetag'] = 'Traj/test'
+config['filetag'] = 'test'
+config['trajOutputInterval'] = 10
 
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
 
 agent.env = ActiveParticleEnv('config_test.json',1)
 
+delta = np.array([[15, 0], [15, 15], [15, -15], [-15, 0], [-15, -15], [-15, 15], [0, -15], [0, 15]])
+targets = delta + config['currentState'][:2]
 
-nTraj = 20
+
+nTargets = len(targets)
+nTraj = 1
 endStep = 500
-recorder = []
-for i in range(nTraj):
-    print(i)
-    state = agent.env.reset()
-    agent.env.currentState[2] = random.random() * 2 * np.pi
-    done = False
-    rewardSum = 0
-    stepCount = 0
 
-    while not done:
-        action = agent.select_action(agent.actorNet, state, noiseFlag=False)
-        nextState, reward, done, info = agent.env.step(action)
-        stepCount += 1
+for j in range(nTargets):
+    recorder = []
 
-        state = nextState
-        rewardSum += reward
-        if done:
-            print("done in step count: {}".format(stepCount))
-            break
-        if stepCount > endStep:
-            break
-    print("reward sum = " + str(rewardSum))
+    for i in range(nTraj):
+        print(i)
+        agent.env.config['targetState'] = targets[j]
+        state = agent.env.reset()
+
+        done = False
+        rewardSum = 0
+        stepCount = 0
+        info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + [0.0 for _ in range(N_A)]
+        recorder.append(info)
+        while not done:
+            action = agent.select_action(agent.actorNet, state, noiseFlag=False)
+            nextState, reward, done, info = agent.env.step(action)
+            stepCount += 1
+            info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + action.tolist()
+            recorder.append(info)
+            state = nextState
+            rewardSum += reward
+            if done:
+                print("done in step count: {}".format(stepCount))
+                break
+            if stepCount > endStep:
+                break
+        print("reward sum = " + str(rewardSum))
+
+    recorderNumpy = np.array(recorder)
+    np.savetxt('testTraj_target_'+str(j)+'.txt', recorder, fmt='%.3f')
+

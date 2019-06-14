@@ -110,7 +110,8 @@ with open('config_test.json', 'w') as f:
 
 agent.env = ActiveParticleEnv('config_test.json',1)
 
-delta = np.array([[5, 0], [5, 5], [5, -5], [-5, 0], [-5, -5], [-5, 5], [0, -5], [0, 5]])
+delta = np.array([[15, 0], [15, 15], [15, -15], [-15, 0], [-15, -15], [-15, 15], [0, -15], [0, 15]])
+
 targets = delta + config['currentState'][:2]
 
 
