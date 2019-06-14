@@ -54,7 +54,8 @@ enum class ParticleType {
     FULLCONTROL,
     VANILLASP,
     CIRCLER,
-    SLIDER
+    SLIDER,
+    TWODIM
 };
 struct ParticleState {
     double r[2],F[2];

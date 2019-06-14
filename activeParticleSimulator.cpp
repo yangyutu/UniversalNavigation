@@ -42,6 +42,8 @@ void ActiveParticleSimulator::readConfigFile() {
         particle->type = ParticleType::CIRCLER;
     } else if (typeString.compare("SLIDER") == 0) {
         particle->type = ParticleType::SLIDER;
+    } else if (typeString.compare("TWODIM") == 0) {
+        particle->type = ParticleType::TWODIM;
     } else {
         std::cout << "particle type out of range" << std::endl;
         exit(2);
@@ -52,7 +54,7 @@ void ActiveParticleSimulator::readConfigFile() {
 
     maxSpeed = config["maxSpeed"]; //units of radius per chacteristic time
     radius = config["radius"];
-    maxSpeed = maxSpeed * radius;
+    maxSpeed = maxSpeed * radius / Tc;
     dt_ = config["dt"]; // units of characteristc time
     trajOutputInterval = 1.0 / dt_;
     if (config.contains("trajOutputInterval")) {
@@ -146,6 +148,11 @@ void ActiveParticleSimulator::run(int steps, const std::vector<double>& actions)
             particle->w = actions[0] * maxTurnSpeed;
         }
 
+        if (particle->type == ParticleType::TWODIM) {
+            particle->u = maxSpeed * actions[0];
+            particle->v = maxSpeed * actions[1];
+            particle->w = 0.0;
+        }
 
         double randomX, randomY, randomPhi;
         randomX = sqrt(2.0 * diffusivity_t * dt_) * (*rand_normal)(rand_generator);

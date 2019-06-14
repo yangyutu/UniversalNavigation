@@ -41,7 +41,7 @@ class ActiveParticleEnv():
         self.receptHalfWidth = self.config['receptHalfWidth']
         self.padding = self.config['obstacleMapPaddingWidth']
         self.receptWidth = 2 * self.receptHalfWidth + 1
-        self.targetClipLength = 2*self.receptWidth
+        self.targetClipLength = 2 * self.receptHalfWidth
         self.stateDim = (self.receptWidth, self.receptWidth)
        
         self.sensorArrayWidth = (2*self.receptHalfWidth + 1)
@@ -52,7 +52,7 @@ class ActiveParticleEnv():
             self.episodeEndStep = self.config['episodeLength']
 
         self.particleType = self.config['particleType']
-        typeList = ['FULLCONTROL','VANILLASP','CIRCLER','SLIDER']
+        typeList = ['FULLCONTROL','VANILLASP','CIRCLER','SLIDER', 'TWODIM']
         if self.particleType not in typeList:
             sys.exit('particle type not right!')
         
@@ -64,6 +64,8 @@ class ActiveParticleEnv():
             self.nbActions = 1
         elif self.particleType == 'SLIDER':
             self.nbActions = 1
+        elif self.particleType == "TWODIM":
+            self.nbActions = 2
         
         self.startThresh = 1
         self.endThresh = 1
@@ -74,10 +76,10 @@ class ActiveParticleEnv():
         if 'targetThreshFlag' in self.config:
             self.targetThreshFlag = self.config['targetThreshFlag']
 
-        if 'dist_start_thresh' in self.config:
-            self.startThresh = self.config['dist_start_thresh']
-        if 'dist_end_thresh' in self.config:
-            self.endThresh = self.config['dist_end_thresh']
+        if 'target_start_thresh' in self.config:
+            self.startThresh = self.config['target_start_thresh']
+        if 'target_end_thresh' in self.config:
+            self.endThresh = self.config['target_end_thresh']
         if 'distance_thresh_decay' in self.config:
             self.distanceThreshDecay = self.config['distance_thresh_decay']
 
@@ -86,9 +88,22 @@ class ActiveParticleEnv():
             self.obstacleFlg = self.config['obstacleFlag']
             
         self.nStep = self.config['modelNStep']
-        self.endThresh = 0.1
-        if 'endThresh' in self.config:
-            self.endThresh = self.config['endThresh']
+
+        self.distanceScale = 20
+        if 'distanceScale' in self.config:
+            self.distanceScale = self.config['distanceScale']
+
+        self.actionPenalty = 0.0
+        if 'actionPenalty' in self.config:
+            self.actionPenalty = self.config['actionPenalty']
+
+        self.obstaclePenalty = 0.0
+
+        #self.customExploreFlag = False
+        #if 'customExploreFlag' in self.config:
+        #    self.customExploreFlag = self.config['customExploreFlag']
+        #    self.customExploreEpisode = self.config['customExploreEpisode']
+
 
 
 
@@ -141,38 +156,36 @@ class ActiveParticleEnv():
 
     def getHindSightExperience(self, state, action, nextState, info):
 
-        targetNew = self.hindSightInfo['currentState'][0:2]
-
-        distance = targetNew - self.hindSightInfo['previousState'][0:2]
-        phi = self.hindSightInfo['previousState'][2]
-
-
-
-        # distance will be changed from lab coordinate to local coordinate
-        dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
-        dy = - distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
-
-        angle = math.atan2(dy, dx)
-        if math.sqrt(dx**2 + dy**2) > self.targetClipLength:
-            dx = self.targetClipLength * math.cos(angle)
-            dy = self.targetClipLength * math.sin(angle)
-
-        # recover the global target position after target mapping
-        globalTargetX = self.currentState[0] + dx * math.cos(phi) - dy * math.sin(phi)
-        globalTargetY = self.currentState[1] + dx * math.sin(phi) + dy * math.cos(phi)
-
-
-        if self.obstacleFlg:
-
-            sensorInfoMat = self.getSensorInfoFromPos(self.hindSightInfo['previousState'])
-            stateNew = {'sensor': sensorInfoMat,
-                        'target': np.array([dx , dy])}
+        if self.hindSightInfo['obstacle']:
+            return None, None, None, None
         else:
-            stateNew = np.array([dx , dy])
+            targetNew = self.hindSightInfo['currentState'][0:2]
+            distance = targetNew - self.hindSightInfo['previousState'][0:2]
+            phi = self.hindSightInfo['previousState'][2]
+            # distance will be changed from lab coordinate to local coordinate
+            dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+            dy = - distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
 
-        actionNew = action
-        rewardNew = 1.0
-        return stateNew, actionNew, None, rewardNew
+            angle = math.atan2(dy, dx)
+            if math.sqrt(dx**2 + dy**2) > self.targetClipLength:
+                dx = self.targetClipLength * math.cos(angle)
+                dy = self.targetClipLength * math.sin(angle)
+
+            # recover the global target position after target mapping
+            globalTargetX = self.currentState[0] + dx * math.cos(phi) - dy * math.sin(phi)
+            globalTargetY = self.currentState[1] + dx * math.sin(phi) + dy * math.cos(phi)
+
+
+            if self.obstacleFlg:
+                sensorInfoMat = self.getSensorInfoFromPos(self.hindSightInfo['previousState'])
+                stateNew = {'sensor': sensorInfoMat,
+                            'target': np.array([dx, dy]) / self.distanceScale}
+            else:
+                stateNew = np.array([dx, dy]) / self.distanceScale
+
+            actionNew = action
+            rewardNew = 1.0 + self.actionPenaltyCal(action)
+            return stateNew, actionNew, None, rewardNew
 
     def constructSensorArrayIndex(self):
         x_int = np.arange(-self.receptHalfWidth, self.receptHalfWidth + 1)
@@ -186,10 +199,51 @@ class ActiveParticleEnv():
         #         self.sensorMap[(x, y)] = i * self.receptWidth + j
 
 
+    def getCustomAction(self):
+
+        if self.config['particleType'] == 'FULLCONTROL':
+            choice = np.random.randint(0, 3)
+            if choice == 0:
+                action = np.array([1, 0])
+            elif choice == 1:
+                action = np.array([1, -1])
+            elif choice == 2:
+                action = np.array([1, 1])
+        elif self.config['particleType'] == 'VANILLASP':
+            action = np.array([1])
+        elif self.config['particleType'] == 'CIRCLER':
+            action = np.array([1])
+        elif self.config['particleType'] == 'SLIDER':
+            choice = np.random.randint(0, 3)
+            if choice == 0:
+                action = np.array([1])
+            elif choice == 1:
+                action = np.array([0])
+            elif choice == 2:
+                action = np.array([-1])
+        return action
+    def actionPenaltyCal(self, action):
+        actionNorm = np.linalg.norm(action, ord=2)
+        return -self.actionPenalty * actionNorm ** 2
+
+    def obstaclePenaltyCal(self):
+        i = math.floor(self.currentState[0] + 0.5)
+        j = math.floor(self.currentState[1] + 0.5)
+
+        xIdx = self.padding + i
+        yIdx = self.padding + j
+
+        if self.obsMap[xIdx, yIdx] == 1:
+            return -self.obstaclePenalty, True
+        else:
+            return 0, False
+
     def step(self, action):
+        self.hindSightInfo['obstacle'] = False
         self.hindSightInfo['previousState'] = self.currentState.copy()
         reward = 0.0
-
+        #if self.customExploreFlag and self.epiCount < self.customExploreEpisode:
+        #    action = self.getCustomAction()
         self.model.step(self.nStep, action)
         self.currentState = self.model.getPositions()
 
@@ -203,9 +257,18 @@ class ActiveParticleEnv():
             reward = 1.0
             done = True
 
+
+        # penalty for actions
+        reward += self.actionPenaltyCal(action)
+
         # update sensor information
         if self.obstacleFlg:
             self.getSensorInfo()
+            penalty, flag = self.obstaclePenaltyCal()
+            reward += penalty
+            if flag:
+                self.hindSightInfo['obstacle'] = True
+                self.currentState = self.hindSightInfo['previousState'].copy()
         # update step count
         self.stepCount += 1
 
@@ -233,9 +296,9 @@ class ActiveParticleEnv():
         if self.obstacleFlg:
 
             state = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                     'target': np.array([dx , dy])}
+                     'target': np.array([dx , dy]) / self.distanceScale}
         else:
-            state = np.array([dx , dy])
+            state = np.array([dx, dy]) / self.distanceScale
         return state, reward, done, self.info.copy()
 
     def is_terminal(self, distance):
@@ -256,6 +319,7 @@ class ActiveParticleEnv():
         targetThresh = float('inf')
         if self.targetThreshFlag:
             targetThresh = self.thresh_by_episode(self.epiCount) * max(self.mapMat.shape)
+            print('target Thresh', targetThresh)
 
 
         if self.config['dynamicInitialStateFlag']:
@@ -268,6 +332,7 @@ class ActiveParticleEnv():
                 if np.sum(self.obsMap[row-2:row+3, col-2:col+3]) == 0 and distance < targetThresh and not self.is_terminal(distanctVec):
                     break
             # set initial state
+            print('target distance', distance)
             self.currentState = np.array([row - self.padding, col - self.padding, random.random()*2*math.pi], dtype=np.float32)
 
 
@@ -275,12 +340,16 @@ class ActiveParticleEnv():
         self.stepCount = 0
         self.hindSightInfo = {}
         self.info = {}
+        self.info['scaleFactor'] = self.distanceScale
         self.epiCount += 1
 
         self.currentState = np.array(self.config['currentState'], dtype=np.float32)
         self.targetState = np.array(self.config['targetState'], dtype=np.int32)
 
         self.reset_helper()
+        if self.particleType == 'TWODIM': # For TWODIM active particle, orientation does not matter
+            self.currentState[2] = 0.0
+
         self.model.createInitialState(self.currentState[0], self.currentState[1], self.currentState[2])
         # update sensor information
         if self.obstacleFlg:
@@ -305,10 +374,10 @@ class ActiveParticleEnv():
         #angleDistance = math.atan2(distance[1], distance[0]) - self.currentState[2]
         if self.obstacleFlg:
             combinedState = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                             'target': np.array([dx , dy ])}
+                             'target': np.array([dx , dy]) / self.distanceScale}
             return combinedState
         else:
-            return np.array([dx , dy])
+            return np.array([dx , dy]) / self.distanceScale
 
     def initObsMat(self):
         fileName = self.config['mapName']
