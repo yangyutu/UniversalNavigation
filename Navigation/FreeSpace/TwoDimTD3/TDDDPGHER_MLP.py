@@ -1,6 +1,5 @@
 
-
-from Agents.DDPG.DDPG import DDPGAgent
+from Agents.TDDDPG.TDDDPG import TDDDPGAgent
 from Env.CustomEnv.StablizerOneD import StablizerOneDContinuous
 from utils.netInit import xavier_init
 import json
@@ -120,15 +119,18 @@ actorTargetNet = deepcopy(actorNet)
 criticNet = Critic(netParameter['n_feature'] + N_A,
                                     netParameter['n_hidden'])
 
+criticNetTwo = deepcopy(criticNet)
 criticTargetNet = deepcopy(criticNet)
+criticTargetNetTwo = deepcopy(criticNet)
 
 actorOptimizer = optim.Adam(actorNet.parameters(), lr=config['actorLearningRate'])
 criticOptimizer = optim.Adam(criticNet.parameters(), lr=config['criticLearningRate'])
+criticOptimizerTwo = optim.Adam(criticNetTwo.parameters(), lr=config['criticLearningRate'])
 
 actorNets = {'actor': actorNet, 'target': actorTargetNet}
-criticNets = {'critic': criticNet, 'target': criticTargetNet}
-optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
-agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A)
+criticNets = {'criticOne': criticNet, 'criticTwo': criticNetTwo, 'targetOne': criticTargetNet, 'targetTwo': criticTargetNetTwo}
+optimizers = {'actor': actorOptimizer, 'criticOne':criticOptimizer, 'criticTwo': criticOptimizerTwo}
+agent = TDDDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A)
 
 
 plotPolicyFlag = False

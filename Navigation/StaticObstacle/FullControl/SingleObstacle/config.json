@@ -8,7 +8,7 @@
     "randomMoveFlag": false,
     "constantPropel": true,
     "particleType": "FULLCONTROL",
-    "trajOutputFlag":true,
+    "trajOutputFlag":false,
     "filetag":"Traj/trajOut",
     "maxSpeed": 20,
     "maxAngleTurn": 15,
