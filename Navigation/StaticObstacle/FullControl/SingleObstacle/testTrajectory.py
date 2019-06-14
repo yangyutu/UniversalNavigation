@@ -195,9 +195,10 @@ agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
-config['currentState'] = [15, 10, 0]
+config['currentState'] = [15, 3, 0]
 config['targetState'] = [3, 3]
-config['filetag'] = 'TrajTest/test'
+config['filetag'] = 'test'
+config['trajOutputInterval'] = 10
 
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
@@ -205,7 +206,7 @@ with open('config_test.json', 'w') as f:
 agent.env = ActiveParticleEnv('config_test.json',1)
 
 
-nTraj = 20
+nTraj = 10
 endStep = 500
 recorder = []
 for i in range(nTraj):
