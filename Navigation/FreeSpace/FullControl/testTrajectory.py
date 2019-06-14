@@ -103,7 +103,10 @@ config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
 config['currentState'] = [15, 15, 0]
 config['targetState'] = [10, 15]
-config['filetag'] = 'Traj/test'
+config['filetag'] = 'test'
+config['trajOutputInterval'] = 1
+config['trajOutputFlag'] = True
+config['customExploreFlag'] = False
 
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
@@ -111,7 +114,7 @@ with open('config_test.json', 'w') as f:
 agent.env = ActiveParticleEnv('config_test.json',1)
 
 delta = np.array([[15, 0], [15, 15], [15, -15], [-15, 0], [-15, -15], [-15, 15], [0, -15], [0, 15]])
-
+delta = delta / 1.5
 targets = delta + config['currentState'][:2]
 
 

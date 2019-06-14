@@ -39,7 +39,7 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, learning_rate=3e-4):
+    def __init__(self, input_size, hidden_size, output_size, config):
         super(Actor, self).__init__()
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -48,6 +48,9 @@ class Actor(nn.Module):
         self.apply(xavier_init)
         self.noise = OUNoise(output_size, seed = 1, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.05, decay_period=10000)
         self.noise.reset()
+
+        self.config = config
+        self.stepCount = 0
     def forward(self, state):
         """
         Param state is a torch tensor
@@ -59,10 +62,41 @@ class Actor(nn.Module):
         action = torch.cat([action0, action1], dim=1)
         return action
 
+    def getCustomAction(self):
+
+        if self.config['particleType'] == 'FULLCONTROL':
+            choice = np.random.randint(0, 3)
+            if choice == 0:
+                action = np.array([1, 0])
+            elif choice == 1:
+                action = np.array([1, -1])
+            elif choice == 2:
+                action = np.array([1, 1])
+        elif self.config['particleType'] == 'VANILLASP':
+            action = np.array([1])
+        elif self.config['particleType'] == 'CIRCLER':
+            action = np.array([1])
+        elif self.config['particleType'] == 'SLIDER':
+            choice = np.random.randint(0, 3)
+            if choice == 0:
+                action = np.array([1])
+            elif choice == 1:
+                action = np.array([0])
+            elif choice == 2:
+                action = np.array([-1])
+
+        return torch.tensor(action, dtype=torch.float32, device=self.config['device']).unsqueeze(0)
+
+
     def select_action(self, state, noiseFlag = False):
-        if noiseFlag:
-            action = self.forward(state)
-            action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
+        self.stepCount += 1
+        if self.config['customExploreFlag'] and self.stepCount <= self.config['customExploreSteps']:
+            action = self.getCustomAction()
+            return action
+        else:
+            if noiseFlag:
+                action = self.forward(state)
+                action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=self.config['device']).unsqueeze(0)
         return self.forward(state)
 
 configName = 'config.json'
@@ -81,7 +115,7 @@ netParameter['n_output'] = N_A
 
 actorNet = Actor(netParameter['n_feature'],
                                     netParameter['n_hidden'],
-                                    netParameter['n_output'])
+                                    netParameter['n_output'], config)
 
 actorTargetNet = deepcopy(actorNet)
 
