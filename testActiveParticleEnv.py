@@ -100,4 +100,20 @@ for i in range(step):
     nextState, reward, action, info = env.step(np.array([w]))
     print(nextState)
     print(info)
-        
+
+
+env = ActiveParticleEnv('config_TWODIM.json',1)
+
+step = 100
+
+state = env.reset()
+print(state)
+
+for i in range(step):
+    state = env.currentState
+    u = np.random.rand() - 0.5
+    v = np.random.rand() - 0.5
+    w = 1.0
+    nextState, reward, action, info = env.step(np.array([u, v]))
+    print(nextState)
+    print(info)
