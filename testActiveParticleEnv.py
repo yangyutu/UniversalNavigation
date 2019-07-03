@@ -112,8 +112,31 @@ print(state)
 for i in range(step):
     state = env.currentState
     u = np.random.rand() - 0.5
+    u = 0.5
+
     v = np.random.rand() - 0.5
-    w = 1.0
+    v = 0.5
+    w = 0.0
     nextState, reward, action, info = env.step(np.array([u, v]))
     print(nextState)
     print(info)
+
+
+env = ActiveParticleEnv('config_dynamicObs.json',1)
+
+step = 10
+
+state = env.reset()
+print(state)
+
+for i in range(step):
+    state = env.currentState
+    #u = (np.random.rand() - 0.5) * 0.2
+    env.model.updateDynamicObstacles(100)
+    env.getSequenceSensorInfo()
+    print(env.sequenceSensorInfoMat)
+    #nextState, reward, action, info = env.step(np.array([u]))
+
+    #print(nextState)
+    #print(info)
+

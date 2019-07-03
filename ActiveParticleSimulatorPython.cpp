@@ -5,7 +5,7 @@ setup_pybind11(cfg)
 cfg['compiler_args'] = ['-std=c++11' ]
 cfg['linker_args'] = ['-L/opt/OpenBLAS/lib  -llapack -lblas  -pthread -no-pie']
 cfg['include_dirs']= ['-I/home-4/yyang60@jhu.edu/work/Yang/Downloads/json/include']
-cfg['sources'] = ['activeParticleSimulator.cpp']
+cfg['sources'] = ['activeParticleSimulator.cpp', 'ShapeFactory.cpp']
 %>
 */
 
@@ -22,5 +22,9 @@ PYBIND11_MODULE(ActiveParticleSimulatorPython, m) {
         .def(py::init<std::string, int>())
         .def("createInitialState", &ActiveParticleSimulator::createInitialState)
         .def("step", &ActiveParticleSimulator::step)
-    	.def("getPositions", &ActiveParticleSimulator::get_positions);
+    	.def("getPositions", &ActiveParticleSimulator::get_positions)
+    	.def("getObservation", &ActiveParticleSimulator::get_observation)
+    	.def("checkDynamicTrap", &ActiveParticleSimulator::checkDynamicTrap)
+    	.def("checkDynamicTrapAround", &ActiveParticleSimulator::checkDynamicTrapAround)
+    	.def("updateDynamicObstacles", &ActiveParticleSimulator::updateDynamicObstacles);
 }

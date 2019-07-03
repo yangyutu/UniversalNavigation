@@ -9,33 +9,12 @@
 #include <unordered_map>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include "ShapeFactory.h"
+
 
 using json = nlohmann::json;
 namespace py = pybind11;
-struct CoorPair{
-    int x;
-    int y;
 
-    CoorPair(){};
-    CoorPair(int x0,int y0){x=x0;y=y0;}
-
-};
-
-typedef struct
-{
-    std::size_t operator() (const CoorPair & CP) const {
-            std::size_t h1=std::hash<int>()(CP.x);
-            std::size_t h2 = std::hash<int>()(CP.y);
-            return h1^(h2<<1);
-    }
-}CoorPairHash;
-
-typedef struct
-{
-    bool operator() (const CoorPair & CP1,const CoorPair & CP2) const {
-            return (CP1.x==CP2.x)&&(CP1.y==CP2.y);
-    }
-}CoorPairEqual;
 
 
 struct MapSlot{
@@ -50,6 +29,7 @@ struct MapSlot{
 };
 
 
+
 enum class ParticleType {
     FULLCONTROL,
     VANILLASP,
@@ -62,12 +42,14 @@ struct ParticleState {
     double phi;
     double u, v, w;
     int action;
+    bool trapFlag;
     ParticleType type;
     ParticleState(double x = 0, double y = 0, double phi_0 = 0){
         r[0]=x;r[1]=y;phi=phi_0;
         u = 0;
         v = 0;
         w = 0;
+        trapFlag = false;
     }
 };
 class ActiveParticleSimulator{
@@ -84,19 +66,38 @@ public:
     void createInitialState(double x, double y, double phi);
     void readConfigFile();
     void step(int nstep, py::array_t<double>& actions);
+    bool get_particleDyanmicTrapFlag(){ return particle->trapFlag;}
+    bool checkDynamicTrap();
+    bool _checkDynamicTrapAt(double x, double y);
+    bool checkDynamicTrapAround(double x, double y, double buffer);
+    bool isValidPosition(double x, double y, double buffer);
+    void initializeSensor();
     py::array_t<double> get_positions();
     std::vector<double> get_positions_cpp();
+    std::vector<int> get_observation_cpp(bool orientFlag);
+    py::array_t<int> get_observation(bool orientFlag);
+    
+    void outputDynamicObstacles();
+    void updateDynamicObstacles(int steps);
     void close();
     json config;
 private:
     void read_map();
     void calForces();
-    void calForcesHelper_DL(double ri[3], double rj[3], double F[3],int i, int j);    
-    bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag;
+    void calForcesHelper_DL(double ri[2], double rj[2], double F[2],int i, int j);    
+    void calForcesHelper_DLAO(double ri[2], double rj[2], double F[2],int i, int j);    
+    void constructDynamicObstacles();
+    void fill_observation(std::vector<int>& linearSensorAll, bool orientFlag);
+    std::vector<DynamicObstacle> dynamicObstacles;
+    ShapeFactory shapeFactory;
+    bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag, dynamicObstacleFlag;
     double angleRatio, circularRadius;
+    double dynamicObstacleDistThresh, staticObstacleTrapThresh, wallWidth, wallLength, dynamicObstacleSpacing, dynamicObsMeanSpeed;
+    double Os_pressure, L_dep, combinedSize;
     static const int dimP = 2;
     static const double kb, T, vis;
-    int randomSeed;
+    int randomSeed, n_channels, receptHalfWidth, sensorArraySize, sensorWidth;
+    std::vector<int> sensorXIdx, sensorYIdx;
     double maxSpeed, maxTurnSpeed;
     std::string configName;
     std::shared_ptr<ParticleState> particle;
@@ -109,12 +110,16 @@ private:
     std::string iniFile;
     double dt_, cutoff, mobility, diffusivity_r, diffusivity_t, Tc;
     std::default_random_engine rand_generator;
-    std::shared_ptr<std::normal_distribution<double>> rand_normal;
-    int trajOutputInterval;
+    std::normal_distribution<double> rand_normal{0.0, 1.0};
+    std::uniform_real_distribution<double> rand_uniform{0.0, 1.0};
+    
+    int trajOutputInterval, shapeWidth;
     long long timeCounter,fileCounter;
-    std::ofstream trajOs;
+    std::ofstream trajOs, dynamicObsOs;
     std::string filetag;
     bool trajOutputFlag;
     void outputTrajectory(std::ostream& os);
-    std::unordered_map<CoorPair, MapSlot, CoorPairHash,CoorPairEqual> mapInfo;
+    std::unordered_map<CoorPair, int, CoorPairHash,CoorPairEqual> mapInfo;
+    std::vector<std::unordered_map<CoorPair, int, CoorPairHash,CoorPairEqual>> mapInfoVec;
+    
 };

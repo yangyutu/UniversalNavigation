@@ -1,5 +1,5 @@
 {
-    "mapName": "singleObstacle",
+    "mapName": "fourObstacles",
     "radius": 1e-6,
     "dt": 0.001,
     "Bpp": 2.29,

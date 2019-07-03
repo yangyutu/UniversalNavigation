@@ -93,10 +93,9 @@ class ActorConvNet(nn.Module):
 
         self.fc0 = nn.Linear(2, 128)
         self.fc1 = nn.Linear(self.featureSize() + 128, num_hidden)
-        self.fc2_1 = nn.Linear(num_hidden, 1)
-        self.fc2_2 = nn.Linear(num_hidden, 1)
+        self.fc2 = nn.Linear(num_hidden, num_action)
         self.apply(xavier_init)
-        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.05, decay_period=10000)
+        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.5, min_sigma=0.1, decay_period=1000000)
         self.noise.reset()
 
     def forward(self, state):
@@ -110,9 +109,7 @@ class ActorConvNet(nn.Module):
         yout = F.relu(self.fc0(y))
         out = torch.cat((xout, yout), 1)
         out = F.relu(self.fc1(out))
-        action0 = torch.tanh(self.fc2_1(out))
-        action1 = torch.tanh(self.fc2_2(out))
-        action = torch.cat([action0, action1], dim=1)
+        action = torch.tanh(self.fc2(out))
         return action
 
     def featureSize(self):
@@ -122,6 +119,8 @@ class ActorConvNet(nn.Module):
         if noiseFlag:
             action = self.forward(state)
             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
+            action = torch.clamp(action, -1, 1)
+            return action
         return self.forward(state)
 
 
@@ -146,7 +145,6 @@ def experienceProcessor(state, action, nextState, reward, info):
         dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
         nextState['target'] = np.array([dx / info['scaleFactor'], dy / info['scaleFactor']])
     return state, action, nextState, reward
-
 
 configName = 'config.json'
 with open(configName,'r') as f:
@@ -180,9 +178,82 @@ criticOptimizer = optim.Adam(criticNet.parameters(), lr=config['criticLearningRa
 actorNets = {'actor': actorNet, 'target': actorTargetNet}
 criticNets = {'critic': criticNet, 'target': criticTargetNet}
 optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
-agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor, experienceProcessor=experienceProcessor)
+agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
+
+plotPolicyFlag = True
+N = 100
+if plotPolicyFlag:
+    phiIdx = 0
+    phi = 0
+    policyX = deepcopy(agent.env.mapMat).astype(np.float)
+    policyY = deepcopy(agent.env.mapMat).astype(np.float)
+
+    value = deepcopy(agent.env.mapMat)
+    for i in range(policyX.shape[0]):
+        for j in range(policyX.shape[1]):
+            if env.mapMat[i, j] > 0:
+                policyX[i, j] = -2
+                value[i, j] = -1
+                policyY[i, j] = -2
+
+            else:
+                sensorInfo = agent.env.getSensorInfoFromPos(np.array([i, j, phi]))
+                distance = np.array(config['targetState']) - np.array([i, j])
+                dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+                dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+                angle = math.atan2(dy, dx)
+                if math.sqrt(dx ** 2 + dy ** 2) > agent.env.targetClipLength:
+                    dx = agent.env.targetClipLength * math.cos(angle)
+                    dy = agent.env.targetClipLength * math.sin(angle)
+                state = {'sensor': sensorInfo, 'target': np.array([dx, dy]) / agent.env.distanceScale}
+                stateTorch, _ = agent.stateProcessor([state], device = config['device'])
+                action = agent.actorNet.select_action(stateTorch, noiseFlag=False)
+                value[i, j] = agent.criticNet.forward(stateTorch, action).item()
+                action = action.cpu().detach().numpy()
+                policyX[i, j] = action[0, 0]
+                policyY[i, j] = action[0, 1]
+    np.savetxt(config['mapName'] + 'PolicyXAnalysisBefore' + 'phiIdx' + str(phiIdx) + '.txt', policyX, fmt='%.3f', delimiter='\t')
+    np.savetxt(config['mapName'] + 'PolicyYAnalysisBefore' + 'phiIdx' + str(phiIdx) + '.txt', policyY, fmt='%.3f',
+               delimiter='\t')
+    np.savetxt(config['mapName'] + 'ValueAnalysisBefore' + 'phiIdx' + str(phiIdx) + '.txt', value, fmt='%.3f', delimiter='\t')
 
 agent.train()
 
 
+
+
+if plotPolicyFlag:
+    phiIdx = 0
+    phi = 0
+    policyX = deepcopy(agent.env.mapMat).astype(np.float)
+    policyY = deepcopy(agent.env.mapMat).astype(np.float)
+
+    value = deepcopy(agent.env.mapMat)
+    for i in range(policyX.shape[0]):
+        for j in range(policyX.shape[1]):
+            if env.mapMat[i, j] > 0:
+                policyX[i, j] = -2
+                value[i, j] = -1
+                policyY[i, j] = -2
+
+            else:
+                sensorInfo = agent.env.getSensorInfoFromPos(np.array([i, j, phi]))
+                distance = np.array(config['targetState']) - np.array([i, j])
+                dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+                dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+                angle = math.atan2(dy, dx)
+                if math.sqrt(dx ** 2 + dy ** 2) > agent.env.targetClipLength:
+                    dx = agent.env.targetClipLength * math.cos(angle)
+                    dy = agent.env.targetClipLength * math.sin(angle)
+                state = {'sensor': sensorInfo, 'target': np.array([dx, dy]) / agent.env.distanceScale}
+                stateTorch, _ = agent.stateProcessor([state], device = config['device'])
+                action = agent.actorNet.select_action(stateTorch, noiseFlag=False)
+                value[i, j] = agent.criticNet.forward(stateTorch, action).item()
+                action = action.cpu().detach().numpy()
+                policyX[i, j] = action[0, 0]
+                policyY[i, j] = action[0, 1]
+    np.savetxt(config['mapName'] + 'PolicyXAnalysisAfter' + 'phiIdx' + str(phiIdx) + '.txt', policyX, fmt='%.3f', delimiter='\t')
+    np.savetxt(config['mapName'] + 'PolicyYAnalysisAfter' + 'phiIdx' + str(phiIdx) + '.txt', policyY, fmt='%.3f',
+               delimiter='\t')
+    np.savetxt(config['mapName'] + 'ValueAnalysisAfter' + 'phiIdx' + str(phiIdx) + '.txt', value, fmt='%.3f', delimiter='\t')

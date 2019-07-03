@@ -1,0 +1,3 @@
+Note that when use gamma 0.99, we should use smaller action penalty to avoid the distortion effects on policy.
+
+For example, if we use 0.01, the agent will prefer smaller steps and delay the arrival (since the discount factor 0.99 is close to 1)

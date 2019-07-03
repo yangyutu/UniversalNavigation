@@ -190,15 +190,16 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
 
-checkpoint = torch.load('Log/Finalepoch4000_checkpoint.pt')
+checkpoint = torch.load('Finalepoch10000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
-config['currentState'] = [15, 3, 0]
-config['targetState'] = [3, 3]
+config['currentState'] = [5, 5, 0]
+config['targetState'] = [70, 60]
 config['filetag'] = 'test'
 config['trajOutputInterval'] = 10
+config['trajOutputFlag'] = True
 
 with open('config_test.json', 'w') as f:
     json.dump(config, f)

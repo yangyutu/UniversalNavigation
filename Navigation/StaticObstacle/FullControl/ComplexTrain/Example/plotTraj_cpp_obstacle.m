@@ -3,11 +3,11 @@ close all
 
 nTarget = 7;
 for i = 0 : nTarget
-    data = load(['../testxyz_' num2str(i) '.txt']);
+    data = load(['testxyz_' num2str(i) '.txt']);
     dataSet{i+1} = data;
 end
 
-obsMap = load('../singleObstacle.txt');
+obsMap = load('../ultraComplexTrainSmall.txt');
 [row, col] = find(obsMap);
 
 
@@ -21,8 +21,8 @@ plot(y,x, 'linewidth',1)
 hold on
 plot(col, row, 'square','markersize',8);
 end
-xlim([-1 20])
-ylim([-1 20])
+xlim([-1 80])
+ylim([-1 80])
 set(gca, 'ydir','reverse')
 
 %set(gca,'box','off')

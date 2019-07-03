@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from utils.OUNoise import OUNoise
-from activeParticleEnv import ActiveParticleEnv
+from activeParticleEnv import ActiveParticleEnvMultiMap, ActiveParticleEnv
 
 import math
 torch.manual_seed(1)
@@ -95,7 +95,7 @@ class ActorConvNet(nn.Module):
         self.fc1 = nn.Linear(self.featureSize() + 128, num_hidden)
         self.fc2 = nn.Linear(num_hidden, num_action)
         self.apply(xavier_init)
-        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.05, decay_period=10000)
+        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.5, min_sigma=0.1, decay_period=1000000)
         self.noise.reset()
 
     def forward(self, state):
@@ -120,6 +120,8 @@ class ActorConvNet(nn.Module):
         if noiseFlag:
             action = self.forward(state)
             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
+            action = torch.clamp(action, -1, 1)
+            return action
         return self.forward(state)
 
 
@@ -134,6 +136,17 @@ def stateProcessor(state, device = 'cpu'):
     nonFinalState = {'sensor': torch.tensor(senorList, dtype=torch.float32, device=device),
               'target': torch.tensor(targetList, dtype=torch.float32, device=device)}
     return nonFinalState, nonFinalMask
+
+def experienceProcessor(state, action, nextState, reward, info):
+    if nextState is not None:
+        target = info['previousTarget']
+        distance = target - info['currentState'][:2]
+        phi = info['currentState'][2]
+        dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+        dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+        nextState['target'] = np.array([dx / info['scaleFactor'], dy / info['scaleFactor']])
+    return state, action, nextState, reward
+
 
 
 configName = 'config.json'
@@ -168,84 +181,67 @@ criticOptimizer = optim.Adam(criticNet.parameters(), lr=config['criticLearningRa
 actorNets = {'actor': actorNet, 'target': actorTargetNet}
 criticNets = {'critic': criticNet, 'target': criticTargetNet}
 optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
-agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
+agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor, experienceProcessor=experienceProcessor)
 
 
-plotPolicyFlag = False
+plotPolicyFlag = True
 N = 100
 if plotPolicyFlag:
-    phi = 0.0
+    for phiIdx in range(8):
+        phi = phiIdx * np.pi / 4.0
+        policy = deepcopy(agent.env.mapMat).astype(np.float)
+        value = deepcopy(agent.env.mapMat)
+        for i in range(policy.shape[0]):
+            for j in range(policy.shape[1]):
+                if env.mapMat[i, j] > 0:
+                    policy[i, j] = -2
+                    value[i, j] = -1
 
-    xSet = np.linspace(-10,10,N)
-    ySet = np.linspace(-10,10,N)
-    policy = np.zeros((N, N))
-
-    value = np.zeros((N, N))
-    for i, x in enumerate(xSet):
-        for j, y in enumerate(ySet):
-            # x, y is the target position, (0, 0, 0) is the particle configuration
-            distance = np.array([x, y])
-            dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
-            dy = distance[0] * math.sin(phi) - distance[1] * math.cos(phi)
-            angle = math.atan2(dy, dx)
-            if math.sqrt(dx ** 2 + dy ** 2) > env.targetClipLength:
-                dx = env.targetClipLength * math.cos(angle)
-                dy = env.targetClipLength * math.sin(angle)
-
-            state = torch.tensor([dx, dy], dtype=torch.float32, device = config['device']).unsqueeze(0)
-            action = agent.actorNet.select_action(state, noiseFlag = False)
-            value[i, j] = agent.criticNet.forward(state, action).item()
-            action = action.cpu().detach().numpy()
-            policy[i, j] = action
-
-    np.savetxt('StabilizerPolicyBeforeTrain.txt', policy, fmt='%+.3f')
-    np.savetxt('StabilizerValueBeforeTrain.txt', value, fmt='%+.3f')
+                else:
+                    sensorInfo = agent.env.getSensorInfoFromPos(np.array([i, j, phi]))
+                    distance = np.array(config['targetState']) - np.array([i, j])
+                    dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+                    dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+                    angle = math.atan2(dy, dx)
+                    if math.sqrt(dx ** 2 + dy ** 2) > agent.env.targetClipLength:
+                        dx = agent.env.targetClipLength * math.cos(angle)
+                        dy = agent.env.targetClipLength * math.sin(angle)
+                    state = {'sensor': sensorInfo, 'target': np.array([dx, dy]) / agent.env.distanceScale}
+                    stateTorch, _ = agent.stateProcessor([state], device = config['device'])
+                    action = agent.actorNet.select_action(stateTorch, noiseFlag=False)
+                    value[i, j] = agent.criticNet.forward(stateTorch, action).item()
+                    action = action.cpu().detach().numpy()
+                    policy[i, j] = action
+        np.savetxt(config['mapName'] + 'PolicyAnalysisBefore' + 'phiIdx' + str(phiIdx) + '.txt', policy, fmt='%.3f', delimiter='\t')
+        np.savetxt(config['mapName'] + 'ValueAnalysisBefore' + 'phiIdx' + str(phiIdx) + '.txt', value, fmt='%.3f', delimiter='\t')
 
 agent.train()
 
-
-
-def customPolicy(state):
-    x = state[0]
-    # move towards negative
-    if x > 0.1:
-        action = 2
-    # move towards positive
-    elif x < -0.1:
-        action = 1
-    # do not move
-    else:
-        action = 0
-    return action
-# storeMemory = ReplayMemory(100000)
-# agent.perform_on_policy(100, customPolicy, storeMemory)
-# storeMemory.write_to_text('performPolicyMemory.txt')
-# transitions = storeMemory.fetch_all_random()
-
 if plotPolicyFlag:
-    phi = 0.0
+    for phiIdx in range(8):
+        phi = phiIdx * np.pi / 4.0
+        policy = deepcopy(agent.env.mapMat).astype(np.float)
+        value = deepcopy(agent.env.mapMat)
+        for i in range(policy.shape[0]):
+            for j in range(policy.shape[1]):
+                if env.mapMat[i, j] > 0:
+                    policy[i, j] = -2
+                    value[i, j] = -1
 
-    xSet = np.linspace(-10,10,N)
-    ySet = np.linspace(-10,10,N)
-    policy = np.zeros((N, N))
-
-    value = np.zeros((N, N))
-    for i, x in enumerate(xSet):
-        for j, y in enumerate(ySet):
-            # x, y is the target position, (0, 0, 0) is the particle configuration
-            distance = np.array([x, y])
-            dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
-            dy = distance[0] * math.sin(phi) - distance[1] * math.cos(phi)
-            angle = math.atan2(dy, dx)
-            if math.sqrt(dx ** 2 + dy ** 2) > env.targetClipLength:
-                dx = env.targetClipLength * math.cos(angle)
-                dy = env.targetClipLength * math.sin(angle)
-
-            state = torch.tensor([dx, dy], dtype=torch.float32, device = config['device']).unsqueeze(0)
-            action = agent.actorNet.select_action(state, noiseFlag = False)
-            value[i, j] = agent.criticNet.forward(state, action).item()
-            action = action.cpu().detach().numpy()
-            policy[i, j] = action
-
-    np.savetxt('StabilizerPolicyAfterTrain.txt', policy, fmt='%+.3f')
-    np.savetxt('StabilizerValueAfterTrain.txt',value, fmt='%+.3f')
+                else:
+                    sensorInfo = agent.env.getSensorInfoFromPos(np.array([i, j, phi]))
+                    distance = np.array(config['targetState']) - np.array([i, j])
+                    dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+                    dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+                    angle = math.atan2(dy, dx)
+                    if math.sqrt(dx ** 2 + dy ** 2) > agent.env.targetClipLength:
+                        dx = agent.env.targetClipLength * math.cos(angle)
+                        dy = agent.env.targetClipLength * math.sin(angle)
+                    state = {'sensor': sensorInfo, 'target': np.array([dx, dy]) / agent.env.distanceScale}
+                    stateTorch, _ = agent.stateProcessor([state], device = config['device'])
+                    action = agent.actorNet.select_action(stateTorch, noiseFlag=False)
+                    value[i, j] = agent.criticNet.forward(stateTorch, action).item()
+                    action = action.cpu().detach().numpy()
+                    policy[i, j] = action
+        np.savetxt(config['mapName'] + 'PolicyAnalysisAfter' + 'phiIdx' + str(phiIdx) + '.txt', policy, fmt='%.3f', delimiter='\t')
+        np.savetxt(config['mapName'] + 'ValueAnalysisAfter' + 'phiIdx' + str(phiIdx) + '.txt', value, fmt='%.3f', delimiter='\t')
