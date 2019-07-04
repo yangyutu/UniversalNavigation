@@ -195,8 +195,9 @@ void ActiveParticleSimulator::readConfigFile() {
         dynamicObsMeanSpeed = config["dynamicObsMeanSpeed"]; 
 
         shapeWidth = config["shapeWidth"];
-        
-        
+        trapFactor = 1.0;
+        if (config.contains("trapFactor"))
+            trapFactor = config["trapFactor"];
         
         n_channels = config["n_channels"];
     }
@@ -236,16 +237,18 @@ void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
     
     
     for (int i = 0; i < dynamicObstacles.size(); i++) {
-        if (dynamicObstacles[i].y < shapeWidth || dynamicObstacles[i].y >= (wallWidth - shapeWidth)){
-            dynamicObstacles[i].speed *= -1.0;
-        }
-        double move = dynamicObstacles[i].speed * steps * dt_ / Tc;
-        dynamicObstacles[i].y += move;
+        //trapping obstacles will not move
+        if (!dynamicObstacles[i].trapFlag){       
+            if (dynamicObstacles[i].y < shapeWidth || dynamicObstacles[i].y >= (wallWidth - shapeWidth)){
+                dynamicObstacles[i].speed *= -1.0;
+            }
+            double move = dynamicObstacles[i].speed * steps * dt_ / Tc;
+            dynamicObstacles[i].y += move;
 
-        for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
-            dynamicObstacles[i].positions[j].y += move;
+            for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
+                dynamicObstacles[i].positions[j].y += move;
+            }
         }
-    
         dynamicObstacles[i].store();
     }
     
@@ -263,6 +266,8 @@ void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
 
 bool ActiveParticleSimulator::_checkDynamicTrapAt(double x, double y){
     bool trapFlag = false;
+    for (int i = 0; i < dynamicObstacles.size(); i++) dynamicObstacles[i].trapFlag = false;
+    
     for (int i = 0; i < dynamicObstacles.size(); i++) {
         double dist = sqrt(pow((dynamicObstacles[i].x - x), 2)
                 + pow((dynamicObstacles[i].y - y), 2));
@@ -273,6 +278,7 @@ bool ActiveParticleSimulator::_checkDynamicTrapAt(double x, double y){
                 double dist2 = sqrt(pow((dynamicObstacles[i].positions[j].x - x), 2)
                 + pow((dynamicObstacles[i].positions[j].y - y), 2));
                 if (dist2 < 2.0) {
+                    dynamicObstacles[i].trapFlag = true;
                     return true;
                 }
 
@@ -336,10 +342,10 @@ void ActiveParticleSimulator::run(int steps, const std::vector<double>& actions)
         }
 
         double randomX, randomY, randomPhi;
-        double trapFactor = 1.0;
+        double factor = 1.0;
         if (obstacleFlag && dynamicObstacleFlag) {
             if (particle->trapFlag) {
-                trapFactor = 0.1;
+                factor = trapFactor;
             }
         }
         
@@ -349,10 +355,10 @@ void ActiveParticleSimulator::run(int steps, const std::vector<double>& actions)
         randomPhi = sqrt(2.0 * diffusivity_r * dt_) * rand_normal(rand_generator);
 
         particle->r[0] += (mobility * particle->F[0] * dt_ +
-                particle->u * dt_) * trapFactor;
+                particle->u * dt_) * factor;
         particle->r[1] += (mobility * particle->F[1] * dt_ +
-                particle->v * dt_) * trapFactor;
-        particle->phi += (particle->w * dt_) * trapFactor;
+                particle->v * dt_) * factor;
+        particle->phi += (particle->w * dt_) * factor;
 
 
 
@@ -446,7 +452,6 @@ void ActiveParticleSimulator::calForces() {
 
 
     if (obstacleFlag && !dynamicObstacleFlag) {
-        particle->trapFlag = false;
         int x_int = (int) std::floor(particle->r[0] / radius + 0.5);
         int y_int = (int) std::floor(particle->r[1] / radius + 0.5);
 
@@ -536,11 +541,13 @@ void ActiveParticleSimulator::outputTrajectory(std::ostream& os) {
         
         for (int i = 0; i < dynamicObstacles.size(); i++ ) {
         dynamicObsOs << this->timeCounter << "\t";
-        
+        dynamicObsOs << i << "\t";
         dynamicObsOs << dynamicObstacles[i].x << "\t";
         dynamicObsOs << dynamicObstacles[i].y << "\t";
         dynamicObsOs << dynamicObstacles[i].phi << "\t";
         dynamicObsOs << dynamicObstacles[i].speed << "\t";
+        dynamicObsOs << dynamicObstacles[i].trapFlag << "\t";
+        
         dynamicObsOs << std::endl;
         }
         

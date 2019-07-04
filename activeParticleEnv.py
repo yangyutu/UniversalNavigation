@@ -174,6 +174,37 @@ class ActiveParticleEnv():
         # use augumented obstacle matrix to check collision
         return np.expand_dims(sensorInfoMat, axis = 0)
 
+    def getExperienceAugmentation(self, state, action, nextState, reward, info):
+        state_Aug, action_Aug, nextState_Aug, reward_Aug = [], [], [], []
+        if not self.obstacleFlag:
+            if self.particleType == 'FULLCONTROL':
+                # state is the position of target in the local frame
+                # here uses the mirror relation
+                state_Aug.append(np.array([state[0], -state[1]]))
+                action_Aug.append(np.array([action[0], -action[1]]))
+                if nextState is None:
+                    nextState_Aug.append(None)
+                else:
+                    nextState_Aug.append(np.array([nextState[0], -nextState[1]]))
+                reward_Aug.append(reward)
+            elif self.particleType == 'SLIDER':
+                state_Aug.append(np.array([state[0], -state[1]]))
+                action_Aug.append(np.array([-action[0]]))
+                if nextState is None:
+                    nextState_Aug.append(None)
+                else:
+                    nextState_Aug.append(np.array([nextState[0], -nextState[1]]))
+                reward_Aug.append(reward)
+            elif self.particleType == 'VANILLASP':
+                state_Aug.append(np.array([state[0], -state[1]]))
+                action_Aug.append(np.array([action[0]]))
+                if nextState is None:
+                    nextState_Aug.append(None)
+                else:
+                    nextState_Aug.append(np.array([nextState[0], -nextState[1]]))
+                reward_Aug.append(reward)
+        return state_Aug, action_Aug, nextState_Aug, reward_Aug
+
     def getHindSightExperience(self, state, action, nextState, info):
 
         if self.hindSightInfo['obstacle']:
@@ -260,10 +291,10 @@ class ActiveParticleEnv():
         if self.obstacleFlag and self.dynamicObstacleFlag:
             trapFlag = self.model.checkDynamicTrap()
             if trapFlag:
-                self.info['dynamicTrap'] = True
+                self.info['dynamicTrap'] += 1
                 return -self.obstaclePenalty, True
             else:
-                self.info['dynamicTrap'] = False
+
                 return 0, False
 
     def step(self, action):
@@ -303,6 +334,8 @@ class ActiveParticleEnv():
             if flag:
                 self.hindSightInfo['obstacle'] = True
                 self.currentState = self.hindSightInfo['previousState'].copy()
+                #if self.dynamicObstacleFlag:
+                #    done = True
         # update step count
         self.stepCount += 1
 
@@ -410,7 +443,9 @@ class ActiveParticleEnv():
     def reset(self):
         self.stepCount = 0
         self.hindSightInfo = {}
+
         self.info = {}
+        self.info['dynamicTrap'] = 0
         self.info['scaleFactor'] = self.distanceScale
         self.epiCount += 1
 

@@ -98,7 +98,7 @@ private:
     static const double kb, T, vis;
     int randomSeed, n_channels, receptHalfWidth, sensorArraySize, sensorWidth;
     std::vector<int> sensorXIdx, sensorYIdx;
-    double maxSpeed, maxTurnSpeed;
+    double maxSpeed, maxTurnSpeed, trapFactor;
     std::string configName;
     std::shared_ptr<ParticleState> particle;
     int numObstacles;

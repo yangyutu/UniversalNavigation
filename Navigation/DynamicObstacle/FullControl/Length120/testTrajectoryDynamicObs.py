@@ -38,12 +38,13 @@ torch.manual_seed(1)
 
 # Convolutional neural network (two convolutional layers)
 class CriticConvNet(nn.Module):
-    def __init__(self, inputWidth, num_hidden, num_action):
+    def __init__(self, inputWidth, num_hidden, num_action, n_channels):
         super(CriticConvNet, self).__init__()
 
         self.inputShape = (inputWidth, inputWidth)
+        self.n_channels = n_channels
         self.layer1 = nn.Sequential(  # input shape (1, inputWdith, inputWdith)
-            nn.Conv2d(1,  # input channel
+            nn.Conv2d(self.n_channels,  # input channel
                       32,  # output channel
                       kernel_size=2,  # filter size
                       stride=1,
@@ -81,16 +82,16 @@ class CriticConvNet(nn.Module):
         return out
 
     def featureSize(self):
-        return self.layer2(self.layer1(torch.zeros(1, 1, *self.inputShape))).view(1, -1).size(1)
+        return self.layer2(self.layer1(torch.zeros(1, self.n_channels, *self.inputShape))).view(1, -1).size(1)
 
 # Convolutional neural network (two convolutional layers)
 class ActorConvNet(nn.Module):
-    def __init__(self, inputWidth, num_hidden, num_action):
+    def __init__(self, inputWidth, num_hidden, num_action, n_channels):
         super(ActorConvNet, self).__init__()
-
+        self.n_channels = n_channels
         self.inputShape = (inputWidth, inputWidth)
         self.layer1 = nn.Sequential(  # input shape (1, inputWdith, inputWdith)
-            nn.Conv2d(1,  # input channel
+            nn.Conv2d(self.n_channels,  # input channel
                       32,  # output channel
                       kernel_size=2,  # filter size
                       stride=1,
@@ -127,20 +128,25 @@ class ActorConvNet(nn.Module):
         yout = F.relu(self.fc0(y))
         out = torch.cat((xout, yout), 1)
         out = F.relu(self.fc1(out))
-        action0 = torch.tanh(self.fc2_1(out))
+        action0 = torch.sigmoid(self.fc2_1(out))
         action1 = torch.tanh(self.fc2_2(out))
         action = torch.cat([action0, action1], dim=1)
+
+        if action is None:
+            print("action is None")
         return action
 
     def featureSize(self):
-        return self.layer2(self.layer1(torch.zeros(1, 1, *self.inputShape))).view(1, -1).size(1)
+        return self.layer2(self.layer1(torch.zeros(1, self.n_channels, *self.inputShape))).view(1, -1).size(1)
+
 
     def select_action(self, state, noiseFlag = False):
         if noiseFlag:
             action = self.forward(state)
             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
+            action = torch.clamp(action, -1, 1)
+            return action
         return self.forward(state)
-
 
 
 def stateProcessor(state, device = 'cpu'):
@@ -171,13 +177,13 @@ netParameter['n_output'] = N_A
 
 actorNet = ActorConvNet(netParameter['n_feature'],
                                     netParameter['n_hidden'],
-                                    netParameter['n_output'])
+                                    netParameter['n_output'], config['n_channels'])
 
 actorTargetNet = deepcopy(actorNet)
 
 criticNet = CriticConvNet(netParameter['n_feature'] ,
                             netParameter['n_hidden'],
-                        netParameter['n_output'])
+                        netParameter['n_output'], config['n_channels'])
 
 criticTargetNet = deepcopy(criticNet)
 
@@ -190,16 +196,18 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
 
-checkpoint = torch.load('Log/Finalepoch4000_checkpoint.pt')
+checkpoint = torch.load('Log/Epoch4000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
-config['currentState'] = [15, 3, 0]
-config['targetState'] = [3, 3]
+config['currentState'] = [50, 15, 0]
+config['targetState'] = [115, 15]
 config['filetag'] = 'test'
+config['trajOutputFlag'] = True
 config['trajOutputInterval'] = 10
+config['trapFactor'] = 0.1
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
 
@@ -229,4 +237,34 @@ for i in range(nTraj):
             break
         if stepCount > endStep:
             break
+    print(info)
+    print("reward sum = " + str(rewardSum))
+
+# benchmark
+
+
+print("****************************direct transport benchmark ******************")
+
+for i in range(nTraj):
+    print(i)
+    state = agent.env.reset()
+    agent.env.currentState[2] = random.random() * 2 * np.pi
+    done = False
+    rewardSum = 0
+    stepCount = 0
+
+    while not done:
+        action = np.array([1.0, 0.0])
+        nextState, reward, done, info = agent.env.step(action)
+        stepCount += 1
+
+        state = nextState
+        rewardSum += reward
+        if done:
+            print("done in step count: {}".format(stepCount))
+
+            break
+        if stepCount > endStep:
+            break
+    print(info)
     print("reward sum = " + str(rewardSum))

@@ -96,8 +96,44 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A)
 
 
-checkpoint = torch.load('Log/Finalepoch5000_checkpoint.pt')
+checkpoint = torch.load('Log/Finalepoch20000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
+
+
+
+plotPolicyFlag = True
+N = 100
+if plotPolicyFlag:
+    phi = 0.0
+
+    xSet = np.linspace(-10,10,N)
+    ySet = np.linspace(-10,10,N)
+    policyX = np.zeros((N, N))
+    policyY = np.zeros((N, N))
+    value = np.zeros((N, N))
+    for i, x in enumerate(xSet):
+        for j, y in enumerate(ySet):
+            # x, y is the target position, (0, 0, 0) is the particle configuration
+            distance = np.array([x, y])
+            dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+            dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+            angle = math.atan2(dy, dx)
+            if math.sqrt(dx ** 2 + dy ** 2) > env.targetClipLength:
+                dx = env.targetClipLength * math.cos(angle)
+                dy = env.targetClipLength * math.sin(angle)
+
+            state = torch.tensor([dx / agent.env.distanceScale, dy / agent.env.distanceScale], dtype=torch.float32, device = config['device']).unsqueeze(0)
+            action = agent.actorNet.select_action(state, noiseFlag = False)
+            value[i, j] = agent.criticNet.forward(state, action).item()
+            action = action.cpu().detach().numpy()
+            policyX[i, j] = action[0, 0]
+            policyY[i, j] = action[0, 1]
+
+    np.savetxt('StabilizerPolicyXTest.txt', policyX, fmt='%+.3f')
+    np.savetxt('StabilizerPolicyYTest.txt', policyY, fmt='%+.3f')
+    np.savetxt('StabilizerValueTest.txt',value, fmt='%+.3f')
+
+
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False

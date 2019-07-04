@@ -88,15 +88,25 @@ class Actor(nn.Module):
         return torch.tensor(action, dtype=torch.float32, device=self.config['device']).unsqueeze(0)
 
 
+    # def select_action(self, state, noiseFlag = False):
+    #     self.stepCount += 1
+    #     if self.config['customExploreFlag'] and self.stepCount <= self.config['customExploreSteps']:
+    #         action = self.getCustomAction()
+    #         return action
+    #     else:
+    #         if noiseFlag:
+    #             action = self.forward(state)
+    #             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=self.config['device']).unsqueeze(0)
+    #     return self.forward(state)
+
     def select_action(self, state, noiseFlag = False):
-        self.stepCount += 1
-        if self.config['customExploreFlag'] and self.stepCount <= self.config['customExploreSteps']:
-            action = self.getCustomAction()
+        if noiseFlag:
+            action = self.forward(state)
+            action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
+            action = torch.clamp(action, -1, 1)
+            if action[0][0] < 0.0:
+                action[0][0] = 0.0
             return action
-        else:
-            if noiseFlag:
-                action = self.forward(state)
-                action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=self.config['device']).unsqueeze(0)
         return self.forward(state)
 
 configName = 'config.json'

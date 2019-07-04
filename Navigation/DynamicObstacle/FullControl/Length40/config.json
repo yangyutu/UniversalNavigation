@@ -24,7 +24,7 @@
     "n_channels": 3,
     "dynamicObstacleDistThresh": 15,
     "dynamicObstacleSpacing": 20,
-    "dynamicObsMeanSpeed": 60,
+    "dynamicObsMeanSpeed": 30,
     "shapeWidth": 4,
     "dist_start_thresh": 0.2,
 	"dist_end_thresh": 0.5,

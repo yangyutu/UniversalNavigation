@@ -59,6 +59,7 @@ struct DynamicObstacle {
         y = y0;
         phi = phi0;
         shapeIdx = shapeIdx0;
+        trapFlag = false;
     }
     void store(){
         positionHistory.push_back(positions);

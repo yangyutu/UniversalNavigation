@@ -136,6 +136,7 @@ def stateProcessor(state, device = 'cpu'):
               'target': torch.tensor(targetList, dtype=torch.float32, device=device)}
     return nonFinalState, nonFinalMask
 
+# experience processor is to avoid target shift
 def experienceProcessor(state, action, nextState, reward, info):
     if nextState is not None:
         target = info['previousTarget']
