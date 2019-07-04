@@ -30,6 +30,8 @@
     "tau": 0.01,
     "hindSightER": true,
     "hindSightERFreq": 10,
+    "experienceAugmentation": true,
+    "experienceAugmentationFreq": 1,
     "actorLearningRate": 0.001,
     "criticLearningRate": 0.001,
     "netGradClip": 1,

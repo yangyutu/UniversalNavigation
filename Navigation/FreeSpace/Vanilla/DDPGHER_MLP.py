@@ -62,6 +62,7 @@ class Actor(nn.Module):
             action = self.forward(state)
             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
             action = torch.clamp(action, 0, 1)
+            return action
         return self.forward(state)
 
 configName = 'config.json'
