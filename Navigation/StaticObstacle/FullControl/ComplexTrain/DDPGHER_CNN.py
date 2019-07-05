@@ -137,6 +137,15 @@ def stateProcessor(state, device = 'cpu'):
               'target': torch.tensor(targetList, dtype=torch.float32, device=device)}
     return nonFinalState, nonFinalMask
 
+def experienceProcessor(state, action, nextState, reward, info):
+    if nextState is not None:
+        target = info['previousTarget']
+        distance = target - info['currentState'][:2]
+        phi = info['currentState'][2]
+        dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+        dy = -distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
+        nextState['target'] = np.array([dx / info['scaleFactor'], dy / info['scaleFactor']])
+    return state, action, nextState, reward
 
 configName = 'config.json'
 with open(configName,'r') as f:
@@ -170,7 +179,7 @@ criticOptimizer = optim.Adam(criticNet.parameters(), lr=config['criticLearningRa
 actorNets = {'actor': actorNet, 'target': actorTargetNet}
 criticNets = {'critic': criticNet, 'target': criticTargetNet}
 optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
-agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
+agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor, experienceProcessor=experienceProcessor)
 
 
 plotPolicyFlag = False
