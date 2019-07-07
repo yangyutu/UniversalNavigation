@@ -245,9 +245,9 @@ void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
             double move = dynamicObstacles[i].speed * steps * dt_ / Tc;
             dynamicObstacles[i].y += move;
 
-            for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
-                dynamicObstacles[i].positions[j].y += move;
-            }
+            //for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
+            //    dynamicObstacles[i].positions[j].y += move;
+            //}
         }
         dynamicObstacles[i].store();
     }
@@ -274,7 +274,7 @@ bool ActiveParticleSimulator::_checkDynamicTrapAt(double x, double y){
 
         if (dist < dynamicObstacleDistThresh) {
             for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
-                double r_obs[2] = {dynamicObstacles[i].positions[j].x , dynamicObstacles[i].positions[j].y};
+                double r_obs[2] = {dynamicObstacles[i].positions[j].x + dynamicObstacles[i].x , dynamicObstacles[i].positions[j].y + dynamicObstacles[i].y};
                 double dist2 = sqrt(pow((dynamicObstacles[i].positions[j].x - x), 2)
                 + pow((dynamicObstacles[i].positions[j].y - y), 2));
                 if (dist2 < 2.0) {
@@ -375,18 +375,11 @@ void ActiveParticleSimulator::run(int steps, const std::vector<double>& actions)
             particle->phi -= 2 * M_PI;
         }
 
-
         this->timeCounter++;
         if (((this->timeCounter) % trajOutputInterval == 0) && trajOutputFlag) {
             this->outputTrajectory(this->trajOs);
         }
-
-
-
     }
-
-
-
 }
 
 
