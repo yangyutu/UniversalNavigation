@@ -94,7 +94,7 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A)
 
 
-checkpoint = torch.load('Log/Finalepoch1000_checkpoint.pt')
+checkpoint = torch.load('Log/Finalepoch20000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 plotPolicyFlag = True

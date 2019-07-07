@@ -107,7 +107,35 @@ struct ShapeFactory{
     void fillShape(std::vector<DynamicObstacle>& obstacles);
 };
 
-
+struct TrapShapeFactory: public ShapeFactory{
+    
+    
+    double shape[12][12] = 
+    {
+        {1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+        {1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+        {1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1},
+        {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+        {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+        {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+        {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+        {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+        {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+        {1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1},
+        {1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+        {1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1}
+    };
+    
+	const double centerX = 6;
+	const double centerY = 6;
+	   
+    std::vector<double> shapeShiftX;
+    std::vector<double> shapeShiftY;
+    TrapShapeFactory(){
+    }
+    void initialize(int shapeWidth);
+    void fillShape(std::vector<DynamicObstacle>& obstacles);
+};
 
 
 
