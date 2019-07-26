@@ -115,6 +115,18 @@ class ActiveParticleEnv():
         if 'finishThresh' in self.config:
             self.finishThresh = self.config['finishThresh']
 
+        self.timingFlag = False
+        if 'timingFlag' in self.config:
+            self.timingFlag = self.config['timingFlag']
+
+            self.timeScale = 100
+            self.timeWindowLocation = self.config['timeWindowLocation']
+            self.rewardArray = self.config['rewardArray']
+            if 'timeScale' in self.config:
+                self.timeScale = self.config['timeScale']
+
+            if self.dynamicObstacleFlag:
+                raise Exception('timing for free space or dynamic obstacle case is not implemented!')
 
 
     def thresh_by_episode(self, step):
@@ -175,6 +187,9 @@ class ActiveParticleEnv():
         return np.expand_dims(sensorInfoMat, axis = 0)
 
     def getExperienceAugmentation(self, state, action, nextState, reward, info):
+        if self.timingFlag:
+            raise Exception('timing for experience Augmentation case is not implemented!')
+
         state_Aug, action_Aug, nextState_Aug, reward_Aug = [], [], [], []
         if not self.obstacleFlag:
             if self.particleType == 'FULLCONTROL':
@@ -207,6 +222,7 @@ class ActiveParticleEnv():
 
     def getHindSightExperience(self, state, action, nextState, info):
 
+
         if self.hindSightInfo['obstacle']:
             return None, None, None, None
         else:
@@ -224,16 +240,28 @@ class ActiveParticleEnv():
 
             if self.obstacleFlag and not self.dynamicObstacleFlag:
                 sensorInfoMat = self.getSensorInfoFromPos(self.hindSightInfo['previousState'])
-                stateNew = {'sensor': sensorInfoMat,
-                            'target': np.array([dx, dy]) / self.distanceScale}
+                if not self.timingFlag:
+                    stateNew = {'sensor': sensorInfoMat,
+                                'target': np.array([dx, dy]) / self.distanceScale}
+                else:
+                    stateNew = {'sensor': sensorInfoMat,
+                                'target': np.array([dx / self.distanceScale, dy / self.distanceScale, state['target'][2]])}
             elif self.obstacleFlag and self.dynamicObstacleFlag:
                 stateNew = {'sensor': state['sensor'],
                             'target': np.array([dx, dy]) / self.distanceScale}
             else:
-                stateNew = np.array([dx, dy]) / self.distanceScale
-
+                if not self.timingFlag:
+                    stateNew = np.array([dx, dy]) / self.distanceScale
+                else:
+                    stateNew = np.array([dx / self.distanceScale, dy / self.distanceScale, \
+                                             state[2]])
             actionNew = action
             rewardNew = 1.0 + self.actionPenaltyCal(action)
+            if self.timingFlag:
+                if info['timeStep'] < self.timeWindowLocation[0]:
+                    rewardNew = -1.0
+                if info['timeStep'] > self.timeWindowLocation[1]:
+                    rewardNew = 0.1
             return stateNew, actionNew, None, rewardNew
 
     def constructSensorArrayIndex(self):
@@ -305,7 +333,7 @@ class ActiveParticleEnv():
         #    action = self.getCustomAction()
         self.model.step(self.nStep, action)
         if self.obstacleFlag and self.dynamicObstacleFlag:
-            self.model.updateDynamicObstacles(self.nStep)
+            self.model.storeDynamicObstacles()
         self.currentState = self.model.getPositions()
         #self.currentState = self.currentState + 2.0 * np.array([action[0], action[1], 0])
 
@@ -313,10 +341,19 @@ class ActiveParticleEnv():
 
         distance = self.targetState - self.currentState[0:2]
 
+        # update step count
+        self.stepCount += 1
+
         done = False
 
         if self.is_terminal(distance):
             reward = 1.0
+            if self.timingFlag:
+                if self.stepCount < self.timeWindowLocation[0]:
+                    reward = -1.0
+                if self.stepCount > self.timeWindowLocation[1]:
+                    reward = 0.1
+
             done = True
 
 
@@ -336,8 +373,7 @@ class ActiveParticleEnv():
                 self.currentState = self.hindSightInfo['previousState'].copy()
                 #if self.dynamicObstacleFlag:
                 #    done = True
-        # update step count
-        self.stepCount += 1
+
 
         # distance will be changed from lab coordinate to local coordinate
         phi = self.currentState[2]
@@ -358,16 +394,25 @@ class ActiveParticleEnv():
         self.info['targetState'] = self.targetState.copy()
         self.info['currentTarget'] = np.array([globalTargetX, globalTargetY])
         self.info['currentDistance'] = math.sqrt(dx**2 + dy**2)
-
+        self.info['timeStep'] = self.stepCount
         if self.obstacleFlag:
             if not self.dynamicObstacleFlag:
-                state = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                         'target': np.array([dx , dy]) / self.distanceScale}
+                if not self.timingFlag:
+                    state = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
+                             'target': np.array([dx , dy]) / self.distanceScale}
+                else:
+                    state = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
+                             'target': np.array([dx / self.distanceScale, dy / self.distanceScale, \
+                                                 float(self.stepCount) / self.timeScale])}
             else:
                 state = {'sensor': self.sequenceSensorInfoMat.copy(),
                          'target': np.array([dx, dy]) / self.distanceScale}
         else:
-            state = np.array([dx, dy]) / self.distanceScale
+            if not self.timingFlag:
+                state = np.array([dx, dy]) / self.distanceScale
+            else:
+                state = np.array([dx / self.distanceScale, dy / self.distanceScale, \
+                          float(self.stepCount) / self.timeScale])
         return state, reward, done, self.info.copy()
 
     def is_terminal(self, distance):
@@ -381,7 +426,7 @@ class ActiveParticleEnv():
                 while True:
                     col = random.randint(2, self.wallWidth - 2)
                     row = random.randint(2, self.wallLength - 2)
-                    if not self.model.checkDynamicTrapAround(row, col, 2):
+                    if not self.model.checkDynamicTrapAround(row, col, 3.0, 10.0):
                         break
                 self.targetState = np.array([row, col], dtype=np.int32)
 
@@ -398,7 +443,7 @@ class ActiveParticleEnv():
                     distanctVec = np.array([row, col],
                                            dtype=np.float32) - self.targetState
                     distance = np.linalg.norm(distanctVec, ord=np.inf)
-                    if not self.model.checkDynamicTrapAround(row, col, 4) and distance < targetThresh and not self.is_terminal(
+                    if not self.model.checkDynamicTrapAround(row, col, 4.0, 10.0) and distance < targetThresh and not self.is_terminal(
                             distanctVec):
                         break
                 # set initial state
@@ -440,12 +485,23 @@ class ActiveParticleEnv():
                 self.currentState = np.array([row - self.padding, col - self.padding, random.random()*2*math.pi], dtype=np.float32)
 
 
+    def generateTimeStep(self):
+        if self.epiCount < self.config['randomEpisode']:
+            return random.choice(list(range(self.timeWindowLocation[1])))
+        else:
+            return 0
+
     def reset(self):
         self.stepCount = 0
+        if self.timingFlag:
+            self.stepCount = self.generateTimeStep()
+
         self.hindSightInfo = {}
 
         self.info = {}
         self.info['dynamicTrap'] = 0
+        self.info['timeStep'] = self.stepCount
+
         self.info['scaleFactor'] = self.distanceScale
         self.epiCount += 1
 
@@ -468,7 +524,7 @@ class ActiveParticleEnv():
         if self.obstacleFlag and self.dynamicObstacleFlag:
             for n in range(self.n_channels):
                 self.model.updateDynamicObstacles(self.nStep)
-
+                self.model.storeDynamicObstacles()
         distance = self.targetState - self.currentState[0:2]
 
         # distance will be change to local coordinate
@@ -488,15 +544,24 @@ class ActiveParticleEnv():
 
         #angleDistance = math.atan2(distance[1], distance[0]) - self.currentState[2]
         if self.obstacleFlag and not self.dynamicObstacleFlag:
-            combinedState = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
-                             'target': np.array([dx, dy]) / self.distanceScale}
+            if not self.timingFlag:
+                combinedState = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
+                                 'target': np.array([dx, dy]) / self.distanceScale}
+            else:
+                combinedState = {'sensor': np.expand_dims(self.sensorInfoMat, axis=0),
+                         'target': np.array([dx / self.distanceScale, dy / self.distanceScale, \
+                                             float(self.stepCount) / self.timeScale])}
             return combinedState
         elif self.obstacleFlag and self.dynamicObstacleFlag:
             combinedState = {'sensor': self.sequenceSensorInfoMat.copy(),
                              'target': np.array([dx, dy]) / self.distanceScale}
             return combinedState
         else:
-            return np.array([dx , dy]) / self.distanceScale
+            if not self.timingFlag:
+                return np.array([dx , dy]) / self.distanceScale
+            else:
+                return np.array([dx / self.distanceScale, dy / self.distanceScale, \
+                                             float(self.stepCount) / self.timeScale])
 
     def initObsMat(self):
         fileName = self.config['mapName']
