@@ -52,7 +52,7 @@ struct DynamicObstacle {
     bool trapFlag;
     int shapeIdx;
     std::vector<CoorPairDouble> positions;
-    std::deque<std::vector<CoorPairDouble>> positionHistory;
+    std::deque<CoorPairDouble> positionHistory;
     static const int capacity = 5;
     DynamicObstacle(double x0, double y0, double phi0, int shapeIdx0){
         x = x0;
@@ -62,52 +62,18 @@ struct DynamicObstacle {
         trapFlag = false;
     }
     void store(){
-        positionHistory.push_back(positions);
+        positionHistory.emplace_back(x, y);
         if (positionHistory.size() == capacity) {
             positionHistory.pop_front();
         }
     }
-    std::deque<std::vector<CoorPairDouble>>& history(){return positionHistory;}
+    std::deque<CoorPairDouble>& history(){return positionHistory;}
     
 };
 
 
 
-struct ShapeFactory{
-    
-    /*
-    int shape[8][8] = 
-    {
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1}
-    };
-    */
-        int shape[6][6] = 
-    {
-        {1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1},
-        {1, 1, 1, 1, 1, 1}
-    };
-    
-    std::vector<std::vector<int>> shapeShiftX;
-    std::vector<std::vector<int>> shapeShiftY;
-    std::vector<std::vector<int>> centers;
-    ShapeFactory(){
-    }
-    void initialize(int shapeWidth);
-    void fillShape(std::vector<DynamicObstacle>& obstacles);
-};
-
-struct TrapShapeFactory: public ShapeFactory{
+struct TrapShapeFactory{
     
     
     double shape[12][12] = 
@@ -133,7 +99,7 @@ struct TrapShapeFactory: public ShapeFactory{
     std::vector<double> shapeShiftY;
     TrapShapeFactory(){
     }
-    void initialize(int shapeWidth);
+    void initialize();
     void fillShape(std::vector<DynamicObstacle>& obstacles);
 };
 

@@ -15,7 +15,7 @@ test.exe: $(OBJ)
 	$(CXX) -o $@ $^ $(LDFLAG) 
 	
 %.o:%.cpp
-	$(CXX) -c $(CXXFLAGS) $(RELEASEFLAG) $^
+	$(CXX) -c $(CXXFLAGS) $(DEBUGFLAG) $^
 	
 
 

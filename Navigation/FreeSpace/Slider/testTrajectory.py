@@ -94,7 +94,7 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A)
 
 
-checkpoint = torch.load('Log/Finalepoch20000_checkpoint.pt')
+checkpoint = torch.load('Log/Finalepoch40000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 plotPolicyFlag = True
@@ -140,6 +140,7 @@ config['dynamicTargetFlag'] = False
 config['currentState'] = [15, 15, 0]
 config['targetState'] = [10, 15]
 config['filetag'] = 'test'
+config['trajOutputFlag'] = True
 config['trajOutputInterval'] = 10
 
 with open('config_test.json', 'w') as f:
@@ -148,12 +149,13 @@ with open('config_test.json', 'w') as f:
 agent.env = ActiveParticleEnv('config_test.json',1)
 
 delta = np.array([[15, 0], [15, 15], [15, -15], [-15, 0], [-15, -15], [-15, 15], [0, -15], [0, 15]])
+delta = delta / 1.5
 targets = delta + config['currentState'][:2]
 
 
 nTargets = len(targets)
 nTraj = 1
-endStep = 500
+endStep = 30
 
 for j in range(nTargets):
     recorder = []
@@ -168,19 +170,16 @@ for j in range(nTargets):
         stepCount = 0
         info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + [0.0 for _ in range(N_A)]
         recorder.append(info)
-        while not done:
+        for stepCount in range(endStep):
             action = agent.select_action(agent.actorNet, state, noiseFlag=False)
             nextState, reward, done, info = agent.env.step(action)
-            stepCount += 1
             info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + action.tolist()
             recorder.append(info)
             state = nextState
             rewardSum += reward
             if done:
                 print("done in step count: {}".format(stepCount))
-                break
-            if stepCount > endStep:
-                break
+                #break
         print("reward sum = " + str(rewardSum))
 
     recorderNumpy = np.array(recorder)

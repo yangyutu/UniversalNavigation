@@ -352,7 +352,7 @@ class ActiveParticleEnv():
                 if self.stepCount < self.timeWindowLocation[0]:
                     reward = -1.0
                 if self.stepCount > self.timeWindowLocation[1]:
-                    reward = 0.1
+                    reward = 1.0
 
             done = True
 
@@ -508,11 +508,13 @@ class ActiveParticleEnv():
         self.currentState = np.array(self.config['currentState'], dtype=np.float32)
         self.targetState = np.array(self.config['targetState'], dtype=np.int32)
 
+        self.model.createInitialState(0.0, 0.0, 0.0)
         self.reset_helper()
+        self.model.setInitialState(self.currentState[0], self.currentState[1], self.currentState[2])
+
         if self.particleType == 'TWODIM': # For TWODIM active particle, orientation does not matter
             self.currentState[2] = 0.0
 
-        self.model.createInitialState(self.currentState[0], self.currentState[1], self.currentState[2])
         # update sensor information
         if self.obstacleFlag:
             if not self.dynamicObstacleFlag:

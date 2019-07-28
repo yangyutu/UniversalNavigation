@@ -156,7 +156,7 @@ targets = delta + config['currentState'][:2]
 
 nTargets = len(targets)
 nTraj = 1
-endStep = 500
+endStep = 30
 
 for j in range(nTargets):
     recorder = []
@@ -171,19 +171,16 @@ for j in range(nTargets):
         stepCount = 0
         info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + [0.0 for _ in range(N_A)]
         recorder.append(info)
-        while not done:
+        for stepCount in range(endStep):
             action = agent.select_action(agent.actorNet, state, noiseFlag=False)
             nextState, reward, done, info = agent.env.step(action)
-            stepCount += 1
             info = [i, stepCount] + agent.env.currentState.tolist() + agent.env.targetState.tolist() + action.tolist()
             recorder.append(info)
             state = nextState
             rewardSum += reward
             if done:
                 print("done in step count: {}".format(stepCount))
-                break
-            if stepCount > endStep:
-                break
+                #break
         print("reward sum = " + str(rewardSum))
 
     recorderNumpy = np.array(recorder)

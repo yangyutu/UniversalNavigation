@@ -77,13 +77,14 @@ void testDynamicObstacleObservation(){
 
     ActiveParticleSimulator simulator("config_dynamicObs.json", 1);
     simulator.outputDynamicObstacles();
-    simulator.createInitialState(10, 5, 0);
+    simulator.createInitialState(10, 20, 0);
     std::default_random_engine rand_generator;
     std::uniform_real_distribution<double>  rand_unif{0.0, 1.0};
     int step = 5;
     for (int i = 0; i < step; i++){
         std::cout << i << std::endl;
-        simulator.updateDynamicObstacles(100);
+        simulator.updateDynamicObstacles(1000);
+        simulator.storeDynamicObstacles();
         simulator.outputDynamicObstacles();
         simulator.get_observation_cpp(true);
     
@@ -99,17 +100,16 @@ void testDynamicObstaclePerformance(){
     //simulator.createInitialState(10, 5, 0);
     std::default_random_engine rand_generator;
     std::uniform_real_distribution<double>  rand_unif{0.0, 1.0};
-    int nRounds = 200;
+    int nRounds = 1;
     for (int j = 0; j < nRounds; j++) {
         std::cout << "cycle: " << j << std::endl;
         simulator.createInitialState(10, 5, 0);
         int step = 200;
         for (int i = 0; i < step; i++){
-            simulator.updateDynamicObstacles(100);
             double speed = (rand_unif(rand_generator) - 0.5) * 0.1;
-            std::vector<double> actions = {speed};
+            std::vector<double> actions = {1.0};
             simulator.run(100, actions);
-            //simulator.outputDynamicObstacles();
+            simulator.outputDynamicObstacles();
             simulator.get_observation_cpp(true);
 
         }
@@ -120,5 +120,6 @@ int main(){
 
     //testSim_Slider();
     //testDynamicObstacle();
+    //testDynamicObstacleObservation();
     testDynamicObstaclePerformance();
 }

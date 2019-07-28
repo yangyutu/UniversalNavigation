@@ -20,5 +20,8 @@ PYBIND11_MODULE(ActiveParticleSimulatorPython, m) {
     	.def("getObservation", &ActiveParticleSimulator::get_observation)
     	.def("checkDynamicTrap", &ActiveParticleSimulator::checkDynamicTrap)
     	.def("checkDynamicTrapAround", &ActiveParticleSimulator::checkDynamicTrapAround)
-    	.def("updateDynamicObstacles", &ActiveParticleSimulator::updateDynamicObstacles);
+    	.def("updateDynamicObstacles", &ActiveParticleSimulator::updateDynamicObstacles)
+    	.def("storeDynamicObstacles", &ActiveParticleSimulator::storeDynamicObstacles)
+        .def("checkSafeHorizontal", &ActiveParticleSimulator::checkSafeHorizontal)
+        .def("setInitialState", &ActiveParticleSimulator::setInitialState);
 }

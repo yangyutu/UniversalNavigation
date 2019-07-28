@@ -8,7 +8,7 @@
     "randomMoveFlag": false,
     "constantPropel": true,
     "particleType": "FULLCONTROL",
-    "trajOutputFlag":false,
+    "trajOutputFlag":true,
     "filetag":"Traj/trajOut",
     "maxSpeed": 20,
     "obstacleFlag": true,
@@ -55,7 +55,7 @@
         0.0
     ],
     "dynamicInitialStateFlag": true,
-    "dynamicTargetFlag": true,
+    "dynamicTargetFlag": false,
     "targetThreshFlag": true,
 	"target_start_thresh": 0.2,
 	"target_end_thresh": 1.0,

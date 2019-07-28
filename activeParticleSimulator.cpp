@@ -44,7 +44,7 @@ bool ActiveParticleSimulator::isValidPosition(double x, double y, double buffer)
         return false;
     }
 
-    return !checkDynamicTrapAround(x, y, buffer);
+    return !checkDynamicTrapAround(x, y, buffer, buffer);
 }
 
 void ActiveParticleSimulator::constructDynamicObstacles() {
@@ -60,13 +60,13 @@ void ActiveParticleSimulator::constructDynamicObstacles() {
             break;
         }
         DynamicObstacle obs(x, y, phi, 0);
-        obs.speed = dynamicObsMeanSpeed * (2.0 * rand_uniform(rand_generator) - 1.0); 
+        obs.speed = 0.5 * dynamicObsMeanSpeed * (rand_uniform(rand_generator)) + dynamicObsMeanSpeed; 
         dynamicObstacles.push_back(obs);
         
         phi += M_PI * 0.125;
     }
 
-    shapeFactory.initialize(shapeWidth);
+    shapeFactory.initialize();
     shapeFactory.fillShape(dynamicObstacles);
     for (int i = 0; i < dynamicObstacles.size(); i++){
         for (int n = 0; n < n_channels; n++){
@@ -84,8 +84,8 @@ void ActiveParticleSimulator::outputDynamicObstacles() {
     
     for (int i = 0; i < dynamicObstacles.size(); i++) {
         for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
-            int x_int = dynamicObstacles[i].positions[j].x;
-            int y_int = dynamicObstacles[i].positions[j].y;
+            int x_int = dynamicObstacles[i].positions[j].x + dynamicObstacles[i].x;
+            int y_int = dynamicObstacles[i].positions[j].y + dynamicObstacles[i].y;
             if ((x_int >= 0) && (x_int < wallLength) && (y_int >= 0) && (y_int < wallWidth)) {
     
                 dynamicObsMap[x_int][y_int] = 1;
@@ -231,6 +231,15 @@ std::vector<double> ActiveParticleSimulator::get_positions_cpp() {
 
 }
 
+void ActiveParticleSimulator::storeDynamicObstacles() {
+    
+    for (int i = 0; i < dynamicObstacles.size(); i++) {
+        dynamicObstacles[i].store();
+    }
+    
+}
+
+
 void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
 
     
@@ -249,7 +258,6 @@ void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
             //    dynamicObstacles[i].positions[j].y += move;
             //}
         }
-        dynamicObstacles[i].store();
     }
     
     
@@ -267,17 +275,20 @@ void ActiveParticleSimulator::updateDynamicObstacles(int steps) {
 bool ActiveParticleSimulator::_checkDynamicTrapAt(double x, double y){
     bool trapFlag = false;
     for (int i = 0; i < dynamicObstacles.size(); i++) dynamicObstacles[i].trapFlag = false;
-    
+   // double minDist = 100;
     for (int i = 0; i < dynamicObstacles.size(); i++) {
+       
+        // distance between (x, y) and dynamic obstacle center
         double dist = sqrt(pow((dynamicObstacles[i].x - x), 2)
                 + pow((dynamicObstacles[i].y - y), 2));
 
         if (dist < dynamicObstacleDistThresh) {
             for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
-                double r_obs[2] = {dynamicObstacles[i].positions[j].x + dynamicObstacles[i].x , dynamicObstacles[i].positions[j].y + dynamicObstacles[i].y};
-                double dist2 = sqrt(pow((dynamicObstacles[i].positions[j].x - x), 2)
-                + pow((dynamicObstacles[i].positions[j].y - y), 2));
-                if (dist2 < 2.0) {
+                double r_obs[2] = {dynamicObstacles[i].positions[j].x + dynamicObstacles[i].x ,
+                                   dynamicObstacles[i].positions[j].y + dynamicObstacles[i].y};
+                double dist2 = sqrt(pow((r_obs[0] - x), 2) + pow((r_obs[1] - y), 2));
+     //           if (dist2 < minDist) minDist = dist2;
+                if (dist2 < 3.0) {
                     dynamicObstacles[i].trapFlag = true;
                     return true;
                 }
@@ -285,14 +296,31 @@ bool ActiveParticleSimulator::_checkDynamicTrapAt(double x, double y){
             }
         }
     }
+    //std::cout << "min Dist " << minDist << " x, y: " << x << "\t" <<y<< std::endl;
     return trapFlag;
 }
 
-bool ActiveParticleSimulator::checkDynamicTrapAround(double x, double y, double buffer){
+bool ActiveParticleSimulator::checkSafeHorizontal(double x, double bufferX){
+     bool trapFlag = false;
+    // double minDist = 100;
+    for (int i = 0; i < dynamicObstacles.size(); i++) {
+       
+        // distance between (x, y) and dynamic obstacle center
+        double dist = abs(dynamicObstacles[i].x - x);
+        if (dist > bufferX){
+            return true;
+        }
+    }
+     return trapFlag;
+}
 
-    for (int i = -1; i < 2; i++){
-        for (int j = -1; j < 2; j++) {        
-            if (_checkDynamicTrapAt(x + i, y + i)){
+
+
+bool ActiveParticleSimulator::checkDynamicTrapAround(double x, double y, double bufferX, double bufferY){
+    //std::cout << "buffer " << buffer << " x, y: " << x << "\t" <<y<< std::endl;
+    for (int i = -bufferX; i < bufferX + 1; i++){
+        for (int j = -bufferY; j < bufferY + 1; j++) {        
+            if (_checkDynamicTrapAt(x + i, y + j)){
                 return true;
             }
         }
@@ -375,6 +403,12 @@ void ActiveParticleSimulator::run(int steps, const std::vector<double>& actions)
             particle->phi -= 2 * M_PI;
         }
 
+        
+        // update dynamic obstacles
+        if (obstacleFlag && dynamicObstacleFlag) {
+            updateDynamicObstacles(1);
+        }
+        
         this->timeCounter++;
         if (((this->timeCounter) % trajOutputInterval == 0) && trajOutputFlag) {
             this->outputTrajectory(this->trajOs);
@@ -396,7 +430,9 @@ void ActiveParticleSimulator::calForcesHelper_DL(double ri[2], double rj[2], dou
     }
     dist = sqrt(dist);
     if (dist < 2.0) {
-        std::cerr << "overlap " << i << "\t with " << j << "\t" << this->timeCounter << "dist: " << dist << std::endl;
+        std::cerr << "overlap " << i << "\t with " << j << "\t at step" << this->timeCounter << " dist: " << dist << std::endl;
+        std::cerr << "particle " << ri[0] / radius <<  "\t" << ri[1] / radius << std::endl;
+        std::cerr << "particle " << rj[0] / radius <<  "\t" << rj[1] / radius << std::endl;
         dist = 2.06;
     }
     if (dist < cutoff) {
@@ -422,6 +458,10 @@ void ActiveParticleSimulator::calForcesHelper_DLAO(double ri[2], double rj[2], d
     dist = sqrt(dist);
     if (dist < 2.0) {
         std::cerr << "overlap " << i << "\t" << j << "\t at" << this->timeCounter << "dist: " << dist << std::endl;
+        std::cerr << "particle " << ri[0] / radius <<  "\t" << ri[1] / radius << std::endl;
+        std::cerr << "particle " << rj[0] / radius <<  "\t" << rj[1] / radius << std::endl;
+        
+        
         dist = 2.06;
     }
 
@@ -458,8 +498,6 @@ void ActiveParticleSimulator::calForces() {
                     calForcesHelper_DL(particle->r, r_obs, F, i, -1);
                     for (int k = 0; k < dimP; k++) {
                         particle->F[k] += F[k];
-
-
                     }
 
                 }
@@ -479,6 +517,24 @@ void ActiveParticleSimulator::calForces() {
         particle->F[1] += 2.0 * Bpp * Kappa * exp(-Kappa * (dist_y - 1.0));
         dist_y = (wallWidth - particle->r[1] / radius);
         particle->F[1] += -2.0 * Bpp * Kappa * exp(-Kappa * (dist_y - 1.0));
+        
+        // calculate interaction from dynamic obstacles
+        for (int i = 0; i < dynamicObstacles.size(); i++) {
+        double dist = sqrt(pow((dynamicObstacles[i].x - particle->r[0] / radius), 2)
+                + pow((dynamicObstacles[i].y - particle->r[1] / radius), 2));
+
+            if (dist < dynamicObstacleDistThresh) {
+                for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
+                    double r_obs[2] = {(dynamicObstacles[i].positions[j].x + dynamicObstacles[i].x) * radius ,
+                                       (dynamicObstacles[i].positions[j].y + dynamicObstacles[i].y) * radius};
+                    double F[2];
+                    calForcesHelper_DL(particle->r, r_obs, F, i, j);
+                    for (int k = 0; k < dimP; k++) {
+                        particle->F[k] += F[k];
+                    }
+                }
+            }
+        }
 
     }
 }
@@ -506,6 +562,14 @@ void ActiveParticleSimulator::createInitialState(double x, double y, double phi)
         constructDynamicObstacles();
     }
 
+}
+
+void ActiveParticleSimulator::setInitialState(double x, double y, double phi) {
+
+    particle->r[0] = x*radius;
+    particle->r[1] = y*radius;
+    particle->phi = phi;
+    
 }
 
 void ActiveParticleSimulator::close() {
@@ -664,9 +728,9 @@ void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll
             auto iter = dynamicObstacles[i].history().crbegin();
 
             for (int n = 0; n < n_channels; n++){
-                for (int j = 0; j < (*iter).size(); j++) {
-                int x_int = (int) std::floor((*iter)[j].x + 0.5);
-                int y_int = (int) std::floor((*iter)[j].y + 0.5);
+                for (int j = 0; j < dynamicObstacles[i].positions.size(); j++) {
+                int x_int = (int) std::floor((*iter).x + dynamicObstacles[i].positions[j].x+ 0.5 );
+                int y_int = (int) std::floor((*iter).y + dynamicObstacles[i].positions[j].y + 0.5);
                     if (mapInfoVec[n].find(CoorPair(x_int, y_int)) == mapInfoVec[n].end()) {
                         mapInfoVec[n][CoorPair(x_int, y_int)] = 1;
                     }

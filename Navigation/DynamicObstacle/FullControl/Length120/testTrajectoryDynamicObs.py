@@ -196,27 +196,30 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
 
-checkpoint = torch.load('Log/Epoch4000_checkpoint.pt')
+checkpoint = torch.load('Log/Epoch5000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
-config['currentState'] = [50, 15, 0]
+config['currentState'] = [75, 15, 0]
 config['targetState'] = [115, 15]
 config['filetag'] = 'test'
 config['trajOutputFlag'] = True
 config['trajOutputInterval'] = 10
-config['trapFactor'] = 0.1
+config['trapFactor'] = 1.0
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
 
 agent.env = ActiveParticleEnv('config_test.json',1)
 
 
-nTraj = 20
-endStep = 500
-recorder = []
+nTraj = 5
+endStep = 200
+
+
+print("****************************direct transport benchmark ******************")
+
 for i in range(nTraj):
     print(i)
     state = agent.env.reset()
@@ -234,13 +237,12 @@ for i in range(nTraj):
         rewardSum += reward
         if done:
             print("done in step count: {}".format(stepCount))
+
             break
         if stepCount > endStep:
             break
     print(info)
     print("reward sum = " + str(rewardSum))
-
-# benchmark
 
 
 print("****************************direct transport benchmark ******************")

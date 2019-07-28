@@ -69,7 +69,10 @@ public:
     bool get_particleDyanmicTrapFlag(){ return particle->trapFlag;}
     bool checkDynamicTrap();
     bool _checkDynamicTrapAt(double x, double y);
-    bool checkDynamicTrapAround(double x, double y, double buffer);
+    bool checkDynamicTrapAround(double x, double y, double bufferX, double bufferY);
+    bool checkSafeHorizontal(double x, double bufferX);
+    void setInitialState(double x, double y, double phi);
+
     bool isValidPosition(double x, double y, double buffer);
     void initializeSensor();
     py::array_t<double> get_positions();
@@ -79,6 +82,7 @@ public:
     
     void outputDynamicObstacles();
     void updateDynamicObstacles(int steps);
+    void storeDynamicObstacles();
     void close();
     json config;
 private:
@@ -89,7 +93,7 @@ private:
     void constructDynamicObstacles();
     void fill_observation(std::vector<int>& linearSensorAll, bool orientFlag);
     std::vector<DynamicObstacle> dynamicObstacles;
-    ShapeFactory shapeFactory;
+    TrapShapeFactory shapeFactory;
     bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag, dynamicObstacleFlag;
     double angleRatio, circularRadius;
     double dynamicObstacleDistThresh, staticObstacleTrapThresh, wallWidth, wallLength, dynamicObstacleSpacing, dynamicObsMeanSpeed;

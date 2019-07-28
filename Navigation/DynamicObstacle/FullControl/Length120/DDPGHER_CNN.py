@@ -97,7 +97,7 @@ class ActorConvNet(nn.Module):
         self.fc2_1 = nn.Linear(num_hidden, 1)
         self.fc2_2 = nn.Linear(num_hidden, 1)
         self.apply(xavier_init)
-        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.05, decay_period=10000)
+        self.noise = OUNoise(num_action, seed=1, mu=0.0, theta=0.15, max_sigma=0.5, min_sigma=0.1, decay_period=100000)
         self.noise.reset()
 
     def forward(self, state):
@@ -128,6 +128,8 @@ class ActorConvNet(nn.Module):
             action = self.forward(state)
             action += torch.tensor(self.noise.get_noise(), dtype=torch.float32, device=config['device']).unsqueeze(0)
             action = torch.clamp(action, -1, 1)
+            if action[0][0] < 0.0:
+                action[0][0] = 0.0
             return action
         return self.forward(state)
 
@@ -177,6 +179,10 @@ actorNets = {'actor': actorNet, 'target': actorTargetNet}
 criticNets = {'critic': criticNet, 'target': criticTargetNet}
 optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
+
+if config['loadCheckpointFlag']:
+    agent.load_checkpoint(config['loadCheckpointPrefix'])
+
 
 
 plotPolicyFlag = False
