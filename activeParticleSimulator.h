@@ -79,6 +79,7 @@ public:
     std::vector<double> get_positions_cpp();
     std::vector<int> get_observation_cpp(bool orientFlag);
     py::array_t<int> get_observation(bool orientFlag);
+    py::array_t<int> get_observation_at(double x0, double y0, double phi0, bool orientFlag);
     
     void outputDynamicObstacles();
     void updateDynamicObstacles(int steps);
@@ -92,9 +93,11 @@ private:
     void calForcesHelper_DLAO(double ri[2], double rj[2], double F[2],int i, int j);    
     void constructDynamicObstacles();
     void fill_observation(std::vector<int>& linearSensorAll, bool orientFlag);
+    void fill_observation_at(double x0, double y0, double phi0, std::vector<int>& linearSensorAll, bool orientFlag);
     std::vector<DynamicObstacle> dynamicObstacles;
     TrapShapeFactory shapeFactory;
     bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag, dynamicObstacleFlag;
+    bool randomDynamicObstacleFlag;
     double angleRatio, circularRadius;
     double dynamicObstacleDistThresh, staticObstacleTrapThresh, wallWidth, wallLength, dynamicObstacleSpacing, dynamicObsMeanSpeed;
     double Os_pressure, L_dep, combinedSize;
@@ -124,6 +127,8 @@ private:
     bool trajOutputFlag;
     void outputTrajectory(std::ostream& os);
     std::unordered_map<CoorPair, int, CoorPairHash,CoorPairEqual> mapInfo;
+    std::vector<std::unordered_map<CoorPair, int, CoorPairHash,CoorPairEqual>> staticMapInfoVec;
+    
     std::vector<std::unordered_map<CoorPair, int, CoorPairHash,CoorPairEqual>> mapInfoVec;
     
 };

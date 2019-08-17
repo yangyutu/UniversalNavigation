@@ -53,17 +53,34 @@ void ActiveParticleSimulator::constructDynamicObstacles() {
     double y;
     double phi = 0.0;
     while (true) { 
-        x += dynamicObstacleSpacing;
-        y = 0.5 * wallWidth;
-
+        
+        
+        if (randomDynamicObstacleFlag) {
+            x += dynamicObstacleSpacing + 0.5 * (rand_uniform(rand_generator) - 0.5) * dynamicObstacleSpacing;
+            y = 0.5 * wallWidth + 0.25 * (rand_uniform(rand_generator) - 0.5) * wallWidth;
+            phi = 2 * M_PI * rand_uniform(rand_generator);
+        } else {
+            x += dynamicObstacleSpacing;
+            y = 0.5 * wallWidth;
+            phi = 0.0;
+        }
         if ((x + 0.5 * dynamicObstacleSpacing) > wallLength) {
             break;
         }
         DynamicObstacle obs(x, y, phi, 0);
-        obs.speed = 0.5 * dynamicObsMeanSpeed * (rand_uniform(rand_generator)) + dynamicObsMeanSpeed; 
+        
+        if (randomDynamicObstacleFlag) {
+            obs.speed = 0.5 * dynamicObsMeanSpeed * (rand_uniform(rand_generator)) + dynamicObsMeanSpeed; 
+            if (rand_uniform(rand_generator) > 0.5){
+                obs.speed = -obs.speed;
+            }
+        } else {
+            obs.speed = dynamicObsMeanSpeed;
+        }
+        
         dynamicObstacles.push_back(obs);
         
-        phi += M_PI * 0.125;
+        
     }
 
     shapeFactory.initialize();
@@ -200,6 +217,12 @@ void ActiveParticleSimulator::readConfigFile() {
             trapFactor = config["trapFactor"];
         
         n_channels = config["n_channels"];
+        
+        randomDynamicObstacleFlag = true;
+        if (config.contains("randomDynamicObstacleFlag")) {
+            randomDynamicObstacleFlag = config["randomDynamicObstacleFlag"];
+        }
+        
     }
     
     receptHalfWidth = config["receptHalfWidth"];
@@ -509,15 +532,29 @@ void ActiveParticleSimulator::calForces() {
          // wall parameters
         double dist_x = (particle->r[0] / radius - 0.0); // one wall's position is at 0
         particle->F[0] += 2.0 * Bpp * Kappa * exp(-Kappa * (dist_x - 1.0));
+        if (dist_x < 1.0){
+            std::cerr << "overlap with wall" << std::endl;
+            std::cerr << "particle " << particle->r[0] / radius  <<  "\t" << particle->r[1] / radius << std::endl;
+        }
         dist_x = (wallLength - particle->r[0] / radius);
         particle->F[0] += -2.0 * Bpp * Kappa * exp(-Kappa * (dist_x - 1.0));
-        
+        if (dist_x < 1.0){
+            std::cerr << "overlap with wall" << std::endl;
+            std::cerr << "particle " << particle->r[0] / radius  <<  "\t" << particle->r[1] / radius << std::endl;
+        }
         // wall parameters
         double dist_y = (particle->r[1] / radius - 0.0); // one wall's position is at 0
         particle->F[1] += 2.0 * Bpp * Kappa * exp(-Kappa * (dist_y - 1.0));
+        if (dist_y < 1.0){
+            std::cerr << "overlap with wall" << std::endl;
+            std::cerr << "particle " << particle->r[0] / radius  <<  "\t" << particle->r[1] / radius << std::endl;
+        }
         dist_y = (wallWidth - particle->r[1] / radius);
         particle->F[1] += -2.0 * Bpp * Kappa * exp(-Kappa * (dist_y - 1.0));
-        
+        if (dist_y < 1.0){
+            std::cerr << "overlap with wall" << std::endl;
+            std::cerr << "particle " << particle->r[0] / radius  <<  "\t" << particle->r[1] / radius << std::endl;
+        }
         // calculate interaction from dynamic obstacles
         for (int i = 0; i < dynamicObstacles.size(); i++) {
         double dist = sqrt(pow((dynamicObstacles[i].x - particle->r[0] / radius), 2)
@@ -685,6 +722,17 @@ py::array_t<int> ActiveParticleSimulator::get_observation(bool orientFlag) {
     return result;
 }
 
+py::array_t<int> ActiveParticleSimulator::get_observation_at(double x0, double y0, double phi0, bool orientFlag) {
+    std::vector<int> linearSensorAll(n_channels * sensorArraySize, 0);
+
+
+    fill_observation_at(x0, y0, phi0, linearSensorAll, orientFlag);
+
+    py::array_t<int> result(n_channels * sensorArraySize, linearSensorAll.data());
+
+    return result;
+}
+
 std::vector<int> ActiveParticleSimulator::get_observation_cpp(bool orientFlag) {
 
     //initialize linear sensor array
@@ -707,11 +755,11 @@ std::vector<int> ActiveParticleSimulator::get_observation_cpp(bool orientFlag) {
         return linearSensorAll;
 }
 
-void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll, bool orientFlag) {
+void ActiveParticleSimulator::fill_observation_at(double x0, double y0, double phi0, std::vector<int>& linearSensorAll, bool orientFlag) {
 
     double phi = 0.0;
     if (orientFlag) {
-        phi = particle->phi;
+        phi = phi0;
     }
     
 
@@ -720,8 +768,8 @@ void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll
         mapInfoVec[n].clear();
     }
     for (int i = 0; i < dynamicObstacles.size(); i++) {
-        double dist = sqrt(pow((dynamicObstacles[i].x - particle->r[0] / radius), 2)
-                + pow((dynamicObstacles[i].y - particle->r[1] / radius), 2));
+        double dist = sqrt(pow((dynamicObstacles[i].x - x0), 2)
+                + pow((dynamicObstacles[i].y - y0), 2));
 
 
         if (dist < dynamicObstacleDistThresh) {
@@ -744,8 +792,8 @@ void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll
     for (int n = 0; n < n_channels; n++) {
         for (int j = 0; j < sensorArraySize; j++) {
             // transform from local to global
-            double x = sensorXIdx[j] * cos(phi) - sensorYIdx[j] * sin(phi) + particle->r[0] / radius;
-            double y = sensorXIdx[j] * sin(phi) + sensorYIdx[j] * cos(phi) + particle->r[1] / radius;
+            double x = sensorXIdx[j] * cos(phi) - sensorYIdx[j] * sin(phi) + x0;
+            double y = sensorXIdx[j] * sin(phi) + sensorYIdx[j] * cos(phi) + y0;
             int x_int = (int) std::floor(x + 0.5);
             int y_int = (int) std::floor(y + 0.5);
 
@@ -758,4 +806,9 @@ void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll
 
         }
     }
+}
+
+
+void ActiveParticleSimulator::fill_observation(std::vector<int>& linearSensorAll, bool orientFlag) {
+    return fill_observation_at(particle->r[0]/radius, particle->r[1]/radius, particle->phi, linearSensorAll, orientFlag);
 }

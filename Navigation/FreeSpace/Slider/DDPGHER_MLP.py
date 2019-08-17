@@ -76,7 +76,7 @@ N_A = env.nbActions
 
 netParameter = dict()
 netParameter['n_feature'] = N_S
-netParameter['n_hidden'] = 100
+netParameter['n_hidden'] = 128
 netParameter['n_output'] = N_A
 
 actorNet = Actor(netParameter['n_feature'],

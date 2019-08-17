@@ -166,6 +166,16 @@ class ActiveParticleEnv():
         self.sequenceSensorInfoMat = self.model.getObservation(orientFlag)
         self.sequenceSensorInfoMat.shape = (self.n_channels, self.receptWidth, self.receptWidth)
 
+    def getSequenceSensorInfoAt(self,x, y, phi):
+
+        orientFlag = True
+        if self.particleType in ['TWODIM']:
+            orientFlag = False
+
+        sequenceSensorInfoMat = self.model.getObservationAt(x, y, phi, orientFlag)
+        sequenceSensorInfoMat.shape = (self.n_channels, self.receptWidth, self.receptWidth)
+        return sequenceSensorInfoMat
+
 
     def getSensorInfoFromPos(self, position):
         phi = position[2]
@@ -426,7 +436,7 @@ class ActiveParticleEnv():
                 while True:
                     col = random.randint(2, self.wallWidth - 2)
                     row = random.randint(2, self.wallLength - 2)
-                    if not self.model.checkDynamicTrapAround(row, col, 3.0, 10.0):
+                    if not self.model.checkDynamicTrapAround(row, col, 3.0, 5.0):
                         break
                 self.targetState = np.array([row, col], dtype=np.int32)
 
@@ -443,7 +453,7 @@ class ActiveParticleEnv():
                     distanctVec = np.array([row, col],
                                            dtype=np.float32) - self.targetState
                     distance = np.linalg.norm(distanctVec, ord=np.inf)
-                    if not self.model.checkDynamicTrapAround(row, col, 4.0, 10.0) and distance < targetThresh and not self.is_terminal(
+                    if not self.model.checkDynamicTrapAround(row, col, 4.0, 5.0) and distance < targetThresh and not self.is_terminal(
                             distanctVec):
                         break
                 # set initial state
@@ -508,7 +518,13 @@ class ActiveParticleEnv():
         self.currentState = np.array(self.config['currentState'], dtype=np.float32)
         self.targetState = np.array(self.config['targetState'], dtype=np.int32)
 
-        self.model.createInitialState(0.0, 0.0, 0.0)
+        self.model.createInitialState(self.currentState[0], self.currentState[1], self.currentState[2])
+        # pre-run obstacle simulations
+        if self.obstacleFlag and self.dynamicObstacleFlag:
+            for n in range(self.n_channels):
+                self.model.updateDynamicObstacles(self.nStep)
+                self.model.storeDynamicObstacles()
+
         self.reset_helper()
         self.model.setInitialState(self.currentState[0], self.currentState[1], self.currentState[2])
 
@@ -522,11 +538,7 @@ class ActiveParticleEnv():
             else:
                 self.getSequenceSensorInfo()
 
-        # pre-run obstacle simulations
-        if self.obstacleFlag and self.dynamicObstacleFlag:
-            for n in range(self.n_channels):
-                self.model.updateDynamicObstacles(self.nStep)
-                self.model.storeDynamicObstacles()
+
         distance = self.targetState - self.currentState[0:2]
 
         # distance will be change to local coordinate

@@ -35,7 +35,6 @@ from activeParticleEnv import ActiveParticleEnv
 import math
 torch.manual_seed(1)
 
-
 # Convolutional neural network (two convolutional layers)
 class CriticConvNet(nn.Module):
     def __init__(self, inputWidth, num_hidden, num_action, n_channels):
@@ -132,10 +131,20 @@ class ActorConvNet(nn.Module):
         action1 = torch.tanh(self.fc2_2(out))
         action = torch.cat([action0, action1], dim=1)
 
-        if action is None:
-            print("action is None")
         return action
 
+    def getLastLayerOut(self, state):
+        x = state['sensor']
+        y = state['target']
+        xout = self.layer1(x)
+        xout = self.layer2(xout)
+        xout = xout.reshape(xout.size(0), -1)
+        # mask xout for test
+        #xout.fill_(0)
+        yout = F.relu(self.fc0(y))
+        out = torch.cat((xout, yout), 1)
+        out = F.relu(self.fc1(out))
+        return out
     def featureSize(self):
         return self.layer2(self.layer1(torch.zeros(1, self.n_channels, *self.inputShape))).view(1, -1).size(1)
 
@@ -159,7 +168,6 @@ def stateProcessor(state, device = 'cpu'):
     nonFinalState = {'sensor': torch.tensor(senorList, dtype=torch.float32, device=device),
               'target': torch.tensor(targetList, dtype=torch.float32, device=device)}
     return nonFinalState, nonFinalMask
-
 
 configName = 'config.json'
 with open(configName,'r') as f:
@@ -196,14 +204,13 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
 
-checkpoint = torch.load('Log/Epoch2000_checkpoint.pt')
+checkpoint = torch.load('Epoch2000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
-
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
 config['currentState'] = [5, 15, 0]
-config['targetState'] = [115, 15]
+config['targetState'] = [35, 15]
 config['filetag'] = 'test'
 config['trajOutputFlag'] = True
 config['trajOutputInterval'] = 100
@@ -214,59 +221,80 @@ with open('config_test.json', 'w') as f:
 agent.env = ActiveParticleEnv('config_test.json',1)
 
 
-nTraj = 10
-endStep = 200
+nTraj = 1
+endStep = 1
+
+state = agent.env.reset()
+agent.env.currentState[2] = random.random() * 2 * np.pi
+done = False
+rewardSum = 0
+stepCount = 0
 
 
-print("****************************direct transport benchmark ******************")
+embedList = []
+valueList = []
+stateList = []
 
-for i in range(nTraj):
-    print(i)
-    state = agent.env.reset()
-    agent.env.currentState[2] = random.random() * 2 * np.pi
-    done = False
-    rewardSum = 0
-    stepCount = 0
+for step in range(endStep):
+    action = agent.select_action(agent.actorNet, state, noiseFlag=False)
+    nextState, reward, done, info = agent.env.step(action)
+    stepCount += 1
 
-    while not done:
-        action = agent.select_action(agent.actorNet, state, noiseFlag=False)
-        nextState, reward, done, info = agent.env.step(action)
-        stepCount += 1
+    state = nextState
+    rewardSum += reward
 
-        state = nextState
-        rewardSum += reward
-        if done:
-            print("done in step count: {}".format(stepCount))
+    for phiIdx in range(8):
+        phi = phiIdx * np.pi / 4.0
+        policy = deepcopy(env.mapMat).astype(np.long)
+        value = deepcopy(env.mapMat)
+        for i in range(policy.shape[0]):
+            for j in range(policy.shape[1]):
+                if env.mapMat[i, j] == 0:
+                    sensorInfo = env.agent.getSensorInfoFromPos(np.array([i, j, phi]))
+                    distance = np.array(config['targetState']) - np.array([i, j])
 
-            break
-        if stepCount > endStep:
-            break
-    print(info)
-    print("reward sum = " + str(rewardSum))
+                    # distance will be change to local coordinate
+                    phi = agent.env.currentState[2]
+                    dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
+                    dy = - distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
 
+                    angle = math.atan2(dy, dx)
+                    if math.sqrt(dx ** 2 + dy ** 2) > agent.env.targetClipLength:
+                        dx = agent.env.targetClipLength * math.cos(angle)
+                        dy = agent.env.targetClipLength * math.sin(angle)
 
-print("****************************direct transport benchmark ******************")
+                    combinedState = {'sensor': np.expand_dims(agent.env.getSequenceSensorInfoAt(i, j, phi), axis=0),
+                                     'target': np.array([dx, dy]) / agent.env.distanceScale}
+                    state = stateProcessor([state], config['device'])[0]
+                    embed = agent.actorNet.getLastLayerOut(state)
+                    action = agent.actorNet.select_action(state, noiseFlag=False)
+                    value = agent.criticNet.forward(state, action).item()
 
-for i in range(nTraj):
-    print(i)
-    state = agent.env.reset()
-    agent.env.currentState[2] = random.random() * 2 * np.pi
-    done = False
-    rewardSum = 0
-    stepCount = 0
+                    embedList.append(embed.cpu().detach().numpy().squeeze())
+                    # policy[i, j] = agent.getPolicy(state)
 
-    while not done:
-        action = np.array([1.0, 0.0])
-        nextState, reward, done, info = agent.env.step(action)
-        stepCount += 1
+                    stateList.append([step, i, j, phi])
+                    valueList.append([step, value])
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
-        state = nextState
-        rewardSum += reward
-        if done:
-            print("done in step count: {}".format(stepCount))
+# Visualization of trained flatten layer (T-SNE)
+tsne = TSNE(perplexity=30, n_components=2, init='pca', n_iter=5000)
+low_dim_embs = tsne.fit_transform(np.array(embedList))
 
-            break
-        if stepCount > endStep:
-            break
-    print(info)
-    print("reward sum = " + str(rewardSum))
+plt.close('all')
+plt.figure(1, figsize=(20, 20))
+plt.scatter(low_dim_embs[:, 0], low_dim_embs[:, 1], c=valueList, cmap='jet')
+plt.colorbar()
+
+sampleIdx = np.random.choice(low_dim_embs.shape[0], 30)
+fig, ax = plt.subplots(figsize=(20, 20))
+plt.scatter(low_dim_embs[sampleIdx, 0], low_dim_embs[sampleIdx, 1], c=[valueList[i] for i in sampleIdx])
+plt.colorbar()
+for i, txt in zip(sampleIdx, [stateList[i] for i in sampleIdx]):
+    ax.annotate(['{:.2f}'.format(x) for x in txt], (low_dim_embs[i, 0], low_dim_embs[i, 1]))
+
+valueArr = np.array(valueList)[:, np.newaxis]
+stateArr = np.array(stateList)
+output = np.hstack((low_dim_embs, valueArr, stateArr))

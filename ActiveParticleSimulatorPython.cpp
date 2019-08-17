@@ -24,6 +24,7 @@ PYBIND11_MODULE(ActiveParticleSimulatorPython, m) {
         .def("step", &ActiveParticleSimulator::step)
     	.def("getPositions", &ActiveParticleSimulator::get_positions)
     	.def("getObservation", &ActiveParticleSimulator::get_observation)
+    	.def("getObservationAt", &ActiveParticleSimulator::get_observation_at)
     	.def("checkDynamicTrap", &ActiveParticleSimulator::checkDynamicTrap)
     	.def("checkDynamicTrapAround", &ActiveParticleSimulator::checkDynamicTrapAround)
     	.def("updateDynamicObstacles", &ActiveParticleSimulator::updateDynamicObstacles)
