@@ -57,8 +57,10 @@ void ActiveParticleSimulator::constructDynamicObstacles() {
         
         if (randomDynamicObstacleFlag) {
             x += dynamicObstacleSpacing + 0.5 * (rand_uniform(rand_generator) - 0.5) * dynamicObstacleSpacing;
-            y = 0.5 * wallWidth + 0.25 * (rand_uniform(rand_generator) - 0.5) * wallWidth;
-            phi = 2 * M_PI * rand_uniform(rand_generator);
+            y = 0.5 * wallWidth + 0.5 * (2.0 * rand_uniform(rand_generator) - 1.0) * wallWidth;
+            if (obstacleRandomOrientationFlag) {
+                phi = 2 * M_PI * rand_uniform(rand_generator);
+            }
         } else {
             x += dynamicObstacleSpacing;
             y = 0.5 * wallWidth;

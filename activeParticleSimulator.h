@@ -97,7 +97,7 @@ private:
     std::vector<DynamicObstacle> dynamicObstacles;
     TrapShapeFactory shapeFactory;
     bool randomMoveFlag, obstacleFlag, wallFlag, constantPropelFlag, dynamicObstacleFlag;
-    bool randomDynamicObstacleFlag;
+    bool randomDynamicObstacleFlag, obstacleRandomOrientationFlag{false};
     double angleRatio, circularRadius;
     double dynamicObstacleDistThresh, staticObstacleTrapThresh, wallWidth, wallLength, dynamicObstacleSpacing, dynamicObsMeanSpeed;
     double Os_pressure, L_dep, combinedSize;
