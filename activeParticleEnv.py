@@ -443,6 +443,9 @@ class ActiveParticleEnv():
             targetThresh = float('inf')
             if self.targetThreshFlag:
                 targetThresh = self.thresh_by_episode(self.epiCount) * max(self.mapMat.shape)
+                if self.dynamicObstacleFlag:
+                    targetThresh = self.thresh_by_episode(self.epiCount) * max(self.wallLength, self.wallWidth)
+
                 print('target Thresh', targetThresh)
 
             if self.config['dynamicInitialStateFlag']:

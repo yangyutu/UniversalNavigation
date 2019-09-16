@@ -204,16 +204,17 @@ optimizers = {'actor': actorOptimizer, 'critic':criticOptimizer}
 agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELoss(reduction='mean'), N_A, stateProcessor=stateProcessor)
 
 
-checkpoint = torch.load('Epoch2000_checkpoint.pt')
+checkpoint = torch.load('../Length55/Log/Finalepoch18000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
 
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
+config['randomDynamicObstacleFlag'] = False
 config['currentState'] = [5, 15, 0]
-config['targetState'] = [35, 15]
+config['targetState'] = [55, 15]
 config['filetag'] = 'test'
 config['trajOutputFlag'] = True
-config['trajOutputInterval'] = 100
+config['trajOutputInterval'] = 1000
 config['trapFactor'] = 1.0
 with open('config_test.json', 'w') as f:
     json.dump(config, f)
@@ -234,6 +235,8 @@ stepCount = 0
 embedList = []
 valueList = []
 stateList = []
+speedList = []
+rotationList = []
 
 for step in range(endStep):
     action = agent.select_action(agent.actorNet, state, noiseFlag=False)
@@ -242,19 +245,19 @@ for step in range(endStep):
 
     state = nextState
     rewardSum += reward
-
-    for phiIdx in range(8):
+    mapMat = np.zeros((config['wallLength'], config['wallWidth']))
+    for phiIdx in range(0, 1):
+        print(phiIdx)
         phi = phiIdx * np.pi / 4.0
-        policy = deepcopy(env.mapMat).astype(np.long)
-        value = deepcopy(env.mapMat)
-        for i in range(policy.shape[0]):
-            for j in range(policy.shape[1]):
-                if env.mapMat[i, j] == 0:
-                    sensorInfo = env.agent.getSensorInfoFromPos(np.array([i, j, phi]))
+        #policy = deepcopy(mapMat).astype(np.long)
+        #value = deepcopy(mapMat)
+        for i in range(2, mapMat.shape[0] - 2, 1):
+            for j in range(2, mapMat.shape[1] - 2, 1):
+                if not agent.env.model.checkDynamicTrapAround(i, j, 1.0, 1.0):
                     distance = np.array(config['targetState']) - np.array([i, j])
 
                     # distance will be change to local coordinate
-                    phi = agent.env.currentState[2]
+                    
                     dx = distance[0] * math.cos(phi) + distance[1] * math.sin(phi)
                     dy = - distance[0] * math.sin(phi) + distance[1] * math.cos(phi)
 
@@ -263,18 +266,24 @@ for step in range(endStep):
                         dx = agent.env.targetClipLength * math.cos(angle)
                         dy = agent.env.targetClipLength * math.sin(angle)
 
-                    combinedState = {'sensor': np.expand_dims(agent.env.getSequenceSensorInfoAt(i, j, phi), axis=0),
+                    combinedState = {'sensor': agent.env.getSequenceSensorInfoAt(i, j, phi),
                                      'target': np.array([dx, dy]) / agent.env.distanceScale}
-                    state = stateProcessor([state], config['device'])[0]
+                    state = stateProcessor([combinedState], config['device'])[0]
                     embed = agent.actorNet.getLastLayerOut(state)
                     action = agent.actorNet.select_action(state, noiseFlag=False)
                     value = agent.criticNet.forward(state, action).item()
-
+                    speedList.append(action[0][0])
+                    rotationList.append(action[0][1])
+                    
                     embedList.append(embed.cpu().detach().numpy().squeeze())
                     # policy[i, j] = agent.getPolicy(state)
 
                     stateList.append([step, i, j, phi])
                     valueList.append([step, value])
+
+print('finish!')
+valueData = np.array(valueList)
+stateArr = np.array(stateList)
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
@@ -285,16 +294,29 @@ low_dim_embs = tsne.fit_transform(np.array(embedList))
 
 plt.close('all')
 plt.figure(1, figsize=(20, 20))
-plt.scatter(low_dim_embs[:, 0], low_dim_embs[:, 1], c=valueList, cmap='jet')
+plt.scatter(low_dim_embs[:, 0], low_dim_embs[:, 1], c=valueData[:,1], cmap='jet')
 plt.colorbar()
 
-sampleIdx = np.random.choice(low_dim_embs.shape[0], 30)
+plt.figure(3)
+plt.scatter(stateArr[:, 1], stateArr[:, 2], c=valueData[:,1], cmap='jet')
+plt.colorbar()
+
+plt.figure(4)
+plt.scatter(stateArr[:, 1], stateArr[:, 2], c=speedList, cmap='jet')
+plt.colorbar()
+
+plt.figure(5)
+plt.scatter(stateArr[:, 1], stateArr[:, 2], c=rotationList, cmap='jet')
+plt.colorbar()
+
+plt.figure(2)
+sampleIdx = np.random.choice(low_dim_embs.shape[0], 50)
 fig, ax = plt.subplots(figsize=(20, 20))
-plt.scatter(low_dim_embs[sampleIdx, 0], low_dim_embs[sampleIdx, 1], c=[valueList[i] for i in sampleIdx])
+plt.scatter(low_dim_embs[sampleIdx, 0], low_dim_embs[sampleIdx, 1], c=[valueData[i, 1] for i in sampleIdx], cmap='jet')
 plt.colorbar()
 for i, txt in zip(sampleIdx, [stateList[i] for i in sampleIdx]):
     ax.annotate(['{:.2f}'.format(x) for x in txt], (low_dim_embs[i, 0], low_dim_embs[i, 1]))
 
-valueArr = np.array(valueList)[:, np.newaxis]
-stateArr = np.array(stateList)
-output = np.hstack((low_dim_embs, valueArr, stateArr))
+
+
+output = np.hstack((low_dim_embs, valueData, stateArr))
