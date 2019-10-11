@@ -66,7 +66,8 @@ void ActiveParticleSimulator::constructDynamicObstacles() {
             y = 0.5 * wallWidth;
             phi = 0.0;
         }
-        if ((x + 0.5 * dynamicObstacleSpacing) > wallLength) {
+        // if x is too close to the wall end
+        if ((x + 0.7 * dynamicObstacleSpacing) > wallLength) {
             break;
         }
         DynamicObstacle obs(x, y, phi, 0);

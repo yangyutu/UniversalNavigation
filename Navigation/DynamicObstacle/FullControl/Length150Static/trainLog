@@ -1,0 +1,15 @@
+reward sum = 0.9043820750088044
+running average episode reward sum: 0.8013343878416292
+{'dynamicTrap': 0, 'timeStep': 11, 'scaleFactor': 20, 'currentTarget': array([145.,  15.]), 'previousTarget': array([145.,  15.]), 'currentState': array([144.66246247,  15.40176519,   3.13660075]), 'targetState': array([145,  15], dtype=int32), 'currentDistance': 0.5247350333585046}
+episode index:39999
+model initialize at round 39999
+target Thresh 76.0
+target distance 41.0
+at step 0:
+{'dynamicTrap': 0, 'timeStep': 1, 'scaleFactor': 20, 'currentTarget': array([133.68935664,  11.9363395 ]), 'previousTarget': array([133.14561016,  12.10868541]), 'currentState': array([104.73279886,   4.09301356,   0.10977286]), 'targetState': array([145,  15], dtype=int32), 'currentDistance': 29.999999999999996}
+done in step count: 25
+reward sum = 0.7778213593991467
+running average episode reward sum: 0.8013338000159183
+{'dynamicTrap': 0, 'timeStep': 26, 'scaleFactor': 20, 'currentTarget': array([145.,  15.]), 'previousTarget': array([145.,  15.]), 'currentState': array([145.53479488,  14.26437308,   5.5118404 ]), 'targetState': array([145,  15], dtype=int32), 'currentDistance': 0.9094792659734493}
+
+Process finished with exit code 0

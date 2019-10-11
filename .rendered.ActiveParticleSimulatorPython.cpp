@@ -24,5 +24,6 @@ PYBIND11_MODULE(ActiveParticleSimulatorPython, m) {
     	.def("updateDynamicObstacles", &ActiveParticleSimulator::updateDynamicObstacles)
     	.def("storeDynamicObstacles", &ActiveParticleSimulator::storeDynamicObstacles)
         .def("checkSafeHorizontal", &ActiveParticleSimulator::checkSafeHorizontal)
-        .def("setInitialState", &ActiveParticleSimulator::setInitialState);
+        .def("setInitialState", &ActiveParticleSimulator::setInitialState)
+        .def("outputDynamicObstacles",&ActiveParticleSimulator::outputDynamicObstacles);
 }

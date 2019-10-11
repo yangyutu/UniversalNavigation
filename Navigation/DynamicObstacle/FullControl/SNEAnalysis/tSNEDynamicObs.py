@@ -206,7 +206,7 @@ agent = DDPGAgent(config, actorNets, criticNets, env, optimizers, torch.nn.MSELo
 
 checkpoint = torch.load('../Length55/Log/Finalepoch18000_checkpoint.pt')
 agent.actorNet.load_state_dict(checkpoint['actorNet_state_dict'])
-
+agent.criticNet.load_state_dict(checkpoint['criticNet_state_dict'])
 config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
 config['randomDynamicObstacleFlag'] = False
