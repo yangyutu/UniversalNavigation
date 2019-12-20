@@ -151,8 +151,18 @@ void ActiveParticleSimulator::readConfigFile() {
         std::cout << "particle type out of range" << std::endl;
         exit(2);
     }
-
+	diffusivity_t = 2.145e-13; // this corresponds the diffusivity of 1um particle
+	diffusivity_t = 2.145e-14; // here I want to manually decrease the random noise
+	//diffusivity_r = parameter.diffu_r; // this correponds to rotation diffusity of 1um particle
     diffusivity_r = 0.161; // characteristic time scale is about 6s
+
+	if (config.contains("Dr")) {
+		diffusivity_r = config["Dr"];
+	}
+
+	if (config.contains("Dt")) {
+		diffusivity_t = config["Dt"];
+	}
     Tc = 1.0 / diffusivity_r;
 
     maxSpeed = config["maxSpeed"]; //units of radius per chacteristic time
@@ -176,9 +186,7 @@ void ActiveParticleSimulator::readConfigFile() {
     maxTurnSpeed = maxSpeed / circularRadius;
 
     dt_ = dt_*Tc;
-    diffusivity_t = 2.145e-13; // this corresponds the diffusivity of 1um particle
-    diffusivity_t = 2.145e-14; // here I want to manually decrease the random noise
-    //diffusivity_r = parameter.diffu_r; // this correponds to rotation diffusity of 1um particle
+
 
     Bpp = config["Bpp"];
     Bpp = Bpp * kb * T * 1e9; //2.29 is Bpp/a/kT
