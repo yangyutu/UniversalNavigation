@@ -155,8 +155,12 @@ class ActiveParticleEnv():
         transIndex[:, 1] += self.padding + j
 
         # use augumented obstacle matrix to check collision
-        self.sensorInfoMat = self.obsMap[transIndex[:, 0], transIndex[:, 1]].reshape(self.receptWidth, -1)
+        try:
+            self.sensorInfoMat = self.obsMap[transIndex[:, 0], transIndex[:, 1]].reshape(self.receptWidth, -1)
 
+        except IndexError:
+            print(self.currentState)
+            exit(2)
     def getSequenceSensorInfo(self):
 
         orientFlag = True
@@ -191,8 +195,11 @@ class ActiveParticleEnv():
         transIndex[:, 1] += self.padding + j
 
         # use augumented obstacle matrix to check collision
-        sensorInfoMat = self.obsMap[transIndex[:, 0], transIndex[:, 1]].reshape(self.receptWidth, -1)
-
+        try:
+            sensorInfoMat = self.obsMap[transIndex[:, 0], transIndex[:, 1]].reshape(self.receptWidth, -1)
+        except IndexError:
+            print(position)
+            exit(2)
         # use augumented obstacle matrix to check collision
         return np.expand_dims(sensorInfoMat, axis = 0)
 
@@ -721,7 +728,7 @@ class ActiveParticleEscapeEnv(ActiveParticleEnv):
     def reset_helper(self):
 
         # because obstacles/hazard regions  are represented by 0.5 and free space is represented by -0.5
-        obstacleThresh = -12
+        obstacleThresh = -15
 
         if self.config['dynamicInitialStateFlag']:
             while True:

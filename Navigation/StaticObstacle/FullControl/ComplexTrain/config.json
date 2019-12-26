@@ -11,6 +11,7 @@
     "trajOutputFlag":false,
     "filetag":"Traj/trajOut",
     "maxSpeed": 20,
+    "circularRadius": 1,
     "obstacleFlag": true,
     "wallFlag": true,
     "modelNStep": 200,
