@@ -115,6 +115,10 @@ class ActiveParticleEnv():
         if 'finishThresh' in self.config:
             self.finishThresh = self.config['finishThresh']
 
+        self.discreteAction = False
+        if 'discreteAction' in self.config:
+            self.discreteAction = True
+
         self.timingFlag = False
         if 'timingFlag' in self.config:
             self.timingFlag = self.config['timingFlag']
@@ -273,6 +277,9 @@ class ActiveParticleEnv():
                     stateNew = np.array([dx / self.distanceScale, dy / self.distanceScale, \
                                              state[2]])
             actionNew = action
+            if self.discreteAction:
+                action = np.array([action]).astype(np.float32)
+
             rewardNew = 1.0 + self.actionPenaltyCal(action)
             if self.timingFlag:
                 if info['timeStep'] < self.timeWindowLocation[0]:
@@ -348,6 +355,10 @@ class ActiveParticleEnv():
         reward = 0.0
         #if self.customExploreFlag and self.epiCount < self.customExploreEpisode:
         #    action = self.getCustomAction()
+        if self.discreteAction:
+            action = np.array([action]).astype(np.float32)
+
+
         self.model.step(self.nStep, action)
         if self.obstacleFlag and self.dynamicObstacleFlag:
             self.model.storeDynamicObstacles()
