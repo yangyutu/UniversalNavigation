@@ -1,15 +1,15 @@
 
 from Agents.DDPG.DDPG import DDPGAgent
-from Env.CustomEnv.StablizerOneD import StablizerOneDContinuous
+
 from utils.netInit import xavier_init
 import json
 from torch import optim
 from copy import deepcopy
-from Env.CustomEnv.StablizerOneD import StablizerOneD
+
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import matplotlib.pyplot as plt
+
 import torch
 from utils.OUNoise import OUNoise
 from activeParticleEnv import ActiveParticleEnv
@@ -73,7 +73,7 @@ N_A = env.nbActions
 
 netParameter = dict()
 netParameter['n_feature'] = N_S
-netParameter['n_hidden'] = 100
+netParameter['n_hidden'] = 128
 netParameter['n_output'] = N_A
 
 actorNet = Actor(netParameter['n_feature'],
@@ -139,7 +139,7 @@ config['dynamicInitialStateFlag'] = False
 config['dynamicTargetFlag'] = False
 config['currentState'] = [15, 15, 0]
 config['targetState'] = [10, 15]
-config['filetag'] = 'test'
+config['filetag'] = 'testLong'
 config['trajOutputInterval'] = 1
 config['trajOutputFlag'] = True
 config['customExploreFlag'] = False
@@ -156,7 +156,7 @@ targets = delta + config['currentState'][:2]
 
 nTargets = len(targets)
 nTraj = 1
-endStep = 30
+endStep = 100
 
 for j in range(nTargets):
     recorder = []
